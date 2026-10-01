@@ -1,0 +1,74 @@
+:root {
+  --ink: #1d1d21;
+  --muted: #5b5b66;
+  --paper: #f6f4ef;
+  --accent: #3a5bd9;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.5 system-ui, sans-serif;
+}
+
+.card {
+  max-width: 34rem;
+  padding: 2.5rem;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.lede {
+  color: var(--muted);
+}
+
+.notes {
+  padding-left: 1.2rem;
+}
+
+.cta {
+  padding: 0.6rem 1.2rem;
+  border: 0;
+  border-radius: 6px;
+  background: #111;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cancel {
+  padding: 0.6rem 1.2rem;
+  border: 0;
+  border-radius: 6px;
+  background: #e9e7e2;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.actions {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}

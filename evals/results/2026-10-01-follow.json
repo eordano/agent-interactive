@@ -1,0 +1,257 @@
+{
+ "label": "2026-10-01 reworded",
+ "at": "2026-10-01T15:00:16.402Z",
+ "port": 5391,
+ "page": "http://localhost:5391/",
+ "summary": {
+  "cases": 26,
+  "scored": 26,
+  "skipped": 0,
+  "request": null,
+  "lane": null,
+  "target": null,
+  "follow": {
+   "hit": 25,
+   "of": 26
+  },
+  "medianMs": 606,
+  "meanTools": null,
+  "meanPromptKB": null
+ },
+ "results": [
+  {
+   "id": "follow-01",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 583
+  },
+  {
+   "id": "follow-02",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 493
+  },
+  {
+   "id": "follow-03",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 444
+  },
+  {
+   "id": "follow-04",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 453
+  },
+  {
+   "id": "follow-05",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 536
+  },
+  {
+   "id": "follow-06",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 672
+  },
+  {
+   "id": "follow-07",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 844
+  },
+  {
+   "id": "follow-08",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 632
+  },
+  {
+   "id": "follow-09",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 652
+  },
+  {
+   "id": "follow-10",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 572
+  },
+  {
+   "id": "follow-11",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 571
+  },
+  {
+   "id": "follow-12",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 1673
+  },
+  {
+   "id": "follow-13",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "new",
+   "follow": false,
+   "ms": 3002
+  },
+  {
+   "id": "follow-14",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 516
+  },
+  {
+   "id": "follow-15",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 460
+  },
+  {
+   "id": "follow-16",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 1448
+  },
+  {
+   "id": "follow-17",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 424
+  },
+  {
+   "id": "follow-18",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 622
+  },
+  {
+   "id": "follow-19",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 638
+  },
+  {
+   "id": "follow-20",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 579
+  },
+  {
+   "id": "follow-21",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 606
+  },
+  {
+   "id": "follow-22",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 763
+  },
+  {
+   "id": "follow-23",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 911
+  },
+  {
+   "id": "follow-24",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 479
+  },
+  {
+   "id": "follow-25",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 610
+  },
+  {
+   "id": "follow-26",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 456
+  }
+ ]
+}

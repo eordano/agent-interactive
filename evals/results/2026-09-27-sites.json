@@ -1,0 +1,64 @@
+{
+ "label": "2026-09-27 baseline",
+ "at": "2026-09-27T14:05:48.739Z",
+ "port": 5440,
+ "page": "http://localhost:5173/",
+ "summary": {
+  "cases": 2,
+  "scored": 2,
+  "skipped": 0,
+  "request": {
+   "hit": 2,
+   "of": 2
+  },
+  "lane": {
+   "hit": 2,
+   "of": 2
+  },
+  "target": {
+   "hit": 1,
+   "of": 2
+  },
+  "medianMs": 9445,
+  "meanTools": 3,
+  "meanPromptKB": 13.5
+ },
+ "results": [
+  {
+   "id": "sites-navbar-darker",
+   "expected": {
+    "verdict": "small",
+    "files": [
+     "src/components/LandingNavbar/LandingNavbar.styled.ts"
+    ]
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true,
+   "planned": "src/components/LandingNavbar/LandingNavbar.styled.ts",
+   "target": true,
+   "ms": 3749,
+   "tools": 2,
+   "promptKB": 3,
+   "answer": "src/components/LandingNavbar/LandingNavbar.styled.ts - `background: 'rgba(22, 21, 24, 0.75)',` + `ba"
+  },
+  {
+   "id": "sites-discord-lower",
+   "expected": {
+    "verdict": "small",
+    "files": [
+     "src/components/Create/Connect/Connect.styled.ts"
+    ]
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true,
+   "planned": "src/components/Create/Why/Why.styled.ts",
+   "target": false,
+   "ms": 9445,
+   "tools": 4,
+   "promptKB": 24,
+   "answer": "File: `src/components/Create/Why/Why.styled.ts` Old: ``` const WhyCardButton = styled('div')(({ them"
+  }
+ ]
+}

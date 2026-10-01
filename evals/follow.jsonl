@@ -1,0 +1,29 @@
+// Is what they just said part of the request before it? From the 2026-09-27 dcl.one session (21:32) and earlier ones,
+// reworded: results before 2026-10-01 scored the words as said.
+{"id":"follow-01","prev":"in settings, escape closes it, but when we click the world let's add some kind of dark","said":["No, forget the dark, just make sure we can leave without the cursor locking."],"expect":{"follow":"append"}}
+{"id":"follow-02","prev":"If it's going to look like this, maybe we could try getting the satellite view.","said":["Could we add a satellite view to this minimap, with two icons, one for map and one for satellite, so we can switch map and satellite"],"expect":{"follow":"append"}}
+{"id":"follow-03","prev":"this pin item, put it beside the up and down toggle, make sure we can do that","said":["Could this minimap embed a satellite view, with two icons, one for map and one for satellite"],"expect":{"follow":"new"}}
+{"id":"follow-04","prev":"Make this title say Own Your Creations.","said":["Every link in this marquee should go to its real action, and remove the asterisk"],"expect":{"follow":"new"}}
+{"id":"follow-05","prev":"No, forget the dark, just make sure we can leave without the cursor locking.","said":["Make the emotes wheel double the size"],"expect":{"follow":"new"}}
+{"id":"follow-06","prev":"Make the emotes wheel double the size","said":["Actually that's too big, shrink it a little"],"expect":{"follow":"append"}}
+{"id":"follow-07","prev":"Also put them on the right side","said":["Oh, it ended up on the left, move it to the right."],"expect":{"follow":"append"}}
+{"id":"follow-08","prev":"Remove paid in USD credits.","said":["Replace created yourself with share your creations"],"expect":{"follow":"new"}}
+{"id":"follow-09","prev":"Let's switch something soon right now to explore","said":["Let's switch something sound right now to explore"],"expect":{"follow":"append"}}
+{"id":"follow-10","prev":"None of these event icons have data. Check that the data is being downloaded from upstream.","said":["Is there telemetry on load times, so we could tune this?"],"expect":{"follow":"new"}}
+{"id":"follow-11","prev":"The roads are not loaded, make sure the roads and all deployments get correctly downloaded","said":["and the parcels too, those are missing as well"],"expect":{"follow":"append"}}
+{"id":"follow-12","prev":"Make the emotes wheel double the size","said":["Make sure the sound controls only appear where they belong"],"expect":{"follow":"new"}}
+// 2026-09-28 00:06-00:40 dcl.one session; "running": "claude" where the change before was on Claude when this was said.
+{"id":"follow-13","prev":"create has icons all over but shop has none, add icons to every one of these items","said":["Shop has a sidebar full of items and so does create, give the shop sidebar emojis like the icons here"],"expect":{"follow":"append"}}
+{"id":"follow-14","prev":"Remove this, it makes no sense.","said":["Remove the text saying life comes from operator's scenes."],"expect":{"follow":"append"}}
+{"id":"follow-15","prev":"The your storage button, make it one of the options here.","said":["Name it storage. this option, just storage, not your storage"],"expect":{"follow":"append"}}
+{"id":"follow-16","prev":"Rename this button to Documentation, or rather just Docs","said":["That wasn't hard, it should have been right here in the open code."],"expect":{"follow":"append"}}
+{"id":"follow-17","prev":"That wasn't hard, it should have been right here in the open code.","running":"claude","said":["No, no, that was a bad idea. I didn't mean..."],"expect":{"follow":"append"}}
+{"id":"follow-18","prev":"Remove this preview button, we don't need it","said":["I think we removed the wrong button, it was the one here in the sidebar"],"expect":{"follow":"append"}}
+{"id":"follow-19","prev":"Could these pills go up here in this bar instead of down there?","running":"claude","said":["There should be space in between, the search bar on the left, get credits, likes and the cart on the right"],"expect":{"follow":"append"}}
+{"id":"follow-20","prev":"Clicking here opens this popover, and the CSS on this search bar looks wrong.","running":"claude","said":["My items look misplaced here."],"expect":{"follow":"new"},"notes":"joined live and waited 88 s for the popover change"}
+{"id":"follow-21","prev":"Remove this button labelled shop all in category","said":["remove this button labelled names in category"],"expect":{"follow":"new"}}
+{"id":"follow-22","prev":"please align these svgs better, they look badly shaped","running":"claude","said":["Clamp this so it doesn't show so many decimals."],"expect":{"follow":"new"}}
+{"id":"follow-23","prev":"The padding here is too large, fix it","running":"claude","said":["Fix the padding on this category side of the top nav bar"],"expect":{"follow":"append"}}
+{"id":"follow-24","prev":"The padding here is too large, fix it","running":"claude","said":["The event images don't seem to come down from upstream."],"expect":{"follow":"new"}}
+{"id":"follow-25","prev":"In the backpack, clicking Decentraland here should take us back to the lobby, like leaving the world","running":"queued","said":["Clicking the center here should take us into the game"],"expect":{"follow":"new"}}
+{"id":"follow-26","prev":"In the backpack, clicking Decentraland here should take us back to the lobby, like leaving the world","running":"queued","said":["Clicking Decentraland here should bring us back to the lobby."],"expect":{"follow":"append"}}

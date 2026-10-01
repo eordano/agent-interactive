@@ -1,0 +1,4 @@
+target/
+/app/src-tauri/icons/
+/app/src-tauri/gen/
+/app/web/vendor/

@@ -1,0 +1,242 @@
+{
+ "model": "claude-opus-5-5",
+ "efforts": [
+  "default",
+  "medium",
+  "high"
+ ],
+ "at": "2026-09-30T14:10:30.315Z",
+ "results": [
+  {
+   "case": "dcl-0929-claude-2",
+   "effort": "high",
+   "doneMs": 40267,
+   "writeMs": 37904,
+   "files": [
+    "ui3/src/shop/discovery/components/search.css"
+   ],
+   "landed": true,
+   "tools": 4,
+   "summary": "I made the search popover solid by loading the missing panel colours into the search styles.",
+   "error": null,
+   "diff": [
+    "ui3/src/shop/discovery/components/search.css | 1 +",
+    " 1 file changed, 1 insertion(+)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-2",
+   "effort": "medium",
+   "doneMs": 45570,
+   "writeMs": 40733,
+   "files": [
+    "ui3/src/shop/discovery/components/search.css"
+   ],
+   "landed": true,
+   "tools": 5,
+   "summary": "I made the search popover load its missing dark background colour; check it's solid now.",
+   "error": null,
+   "diff": [
+    "ui3/src/shop/discovery/components/search.css | 1 +",
+    " 1 file changed, 1 insertion(+)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-2",
+   "effort": "default",
+   "doneMs": 47950,
+   "writeMs": 38589,
+   "files": [
+    "ui3/src/shop/discovery/components/search.css"
+   ],
+   "landed": true,
+   "tools": 5,
+   "summary": "I made the search popover solid by loading its missing background colours.",
+   "error": null,
+   "diff": [
+    "ui3/src/shop/discovery/components/search.css | 2 ++",
+    " 1 file changed, 2 insertions(+)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-3",
+   "effort": "medium",
+   "doneMs": 214438,
+   "writeMs": 57610,
+   "files": [
+    "ui3/src/wearable-preview/outfit.ts",
+    "ui3/src/wearable-preview/avatar.ts",
+    "ui3/src/shop/detail/components/ItemPreview.tsx",
+    "ui3/vitest.config.ts.timestamp-1790776165233-c73918972f6f78.mjs"
+   ],
+   "landed": true,
+   "tools": 11,
+   "summary": "I made the shop's 3D preview dress your own avatar when you're signed in, except emotes and one-sha\u2026",
+   "error": null,
+   "diff": [
+    " ui3/src/wearable-preview/avatar.ts             | 14 ++++++++++++--",
+    " ui3/src/wearable-preview/outfit.ts             |  3 ++-",
+    " 3 files changed, 19 insertions(+), 3 deletions(-)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-3",
+   "effort": "high",
+   "doneMs": 326523,
+   "writeMs": 57509,
+   "files": [
+    "ui3/src/shop/detail/lib/wearOnProfile.ts",
+    "ui3/src/shop/discovery/intl.ts",
+    "ui3/src/shop/detail/components/ItemPreview.tsx",
+    "ui3/vitest.config.ts.timestamp-1790776283941-6843bdb5855188.mjs"
+   ],
+   "landed": true,
+   "tools": 12,
+   "summary": "I changed the shop preview to show your own avatar wearing the item when you're signed in.",
+   "error": null,
+   "diff": [
+    "ui3/src/shop/detail/components/ItemPreview.tsx | 21 ++++++++++++++++-----",
+    " ui3/src/shop/discovery/intl.ts                 |  1 +",
+    " 2 files changed, 17 insertions(+), 5 deletions(-)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-8",
+   "effort": "medium",
+   "doneMs": 181076,
+   "writeMs": 132627,
+   "files": [
+    "ui3/src/web/pages/stblogpost.css"
+   ],
+   "landed": true,
+   "tools": 6,
+   "summary": "I matched the blog post's category and search bar to the blog home's single row.",
+   "error": null,
+   "diff": [
+    "ui3/src/web/pages/stblogpost.css | 6 ++++--",
+    " 1 file changed, 4 insertions(+), 2 deletions(-)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-3",
+   "effort": "default",
+   "doneMs": 505322,
+   "writeMs": 117703,
+   "files": [
+    "ui3/src/wearable-preview/outfit.ts",
+    "ui3/src/shop/discovery/intl.ts",
+    "ui3/src/shop/detail/components/ItemPreview.tsx",
+    "ui3/vitest.config.ts.timestamp-1790776388244-c8b93a3a5a21f8.mjs"
+   ],
+   "landed": true,
+   "tools": 11,
+   "summary": "I made the shop preview show the item on your own avatar when you're signed in, else on the default\u2026",
+   "error": null,
+   "diff": [
+    " ui3/src/shop/discovery/intl.ts                 |  1 +",
+    " ui3/src/wearable-preview/outfit.ts             | 17 +++++++++++++++++",
+    " 3 files changed, 35 insertions(+), 8 deletions(-)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-6",
+   "effort": "medium",
+   "doneMs": 96420,
+   "writeMs": 67576,
+   "files": [
+    "ui3/src/explorer/pages/Communities.tsx",
+    "ui3/src/explorer/pages/social.css",
+    "ui3/vitest.config.ts.timestamp-1790776534840-0d7f854666a198.mjs",
+    "ui3/vitest.config.ts.timestamp-1790776539027-a5f173061118c.mjs"
+   ],
+   "landed": true,
+   "tools": 10,
+   "summary": "I put the Nearby map beside a dark people panel with coloured names and green online counts.",
+   "error": null,
+   "diff": [
+    "ui3/src/explorer/pages/Communities.tsx | 13 +++++++++----",
+    " ui3/src/explorer/pages/social.css      | 35 +++++++++++++++++++++++++++++++++-",
+    " 2 files changed, 43 insertions(+), 5 deletions(-)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-8",
+   "effort": "default",
+   "doneMs": 136233,
+   "writeMs": 119418,
+   "files": [
+    "ui3/src/web/pages/stblogpost.css"
+   ],
+   "landed": true,
+   "tools": 12,
+   "summary": "I took \"sidebar\" as the blog category bar and centred it on the post to match the blog index.",
+   "error": null,
+   "diff": [
+    "ui3/src/web/pages/stblogpost.css | 15 +++++++--------",
+    " 1 file changed, 7 insertions(+), 8 deletions(-)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-6",
+   "effort": "default",
+   "doneMs": 309404,
+   "writeMs": 221082,
+   "files": [
+    "ui3/src/explorer/pages/Communities.tsx",
+    "ui3/src/explorer/pages/social.css",
+    "ui3/src/social/SocialPage.tsx",
+    "ui3/vitest.config.ts.timestamp-1790776968740-100fe0888f5c98.mjs"
+   ],
+   "landed": true,
+   "tools": 27,
+   "summary": "I made Nearby look like the Play lobby: live event cards with Jump in and people tiles.",
+   "error": null,
+   "diff": [
+    " ui3/src/explorer/pages/social.css      | 66 +++++++++++++++++++++++++++++++++-",
+    " ui3/src/social/SocialPage.tsx          | 20 +++++++++++",
+    " 3 files changed, 103 insertions(+), 13 deletions(-)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-6",
+   "effort": "high",
+   "doneMs": 161835,
+   "writeMs": 90751,
+   "files": [
+    "ui3/src/explorer/pages/Communities.tsx",
+    "ui3/src/explorer/pages/social.css",
+    "ui3/src/explorer/pages/Communities.test.tsx",
+    "ui3/src/social/SocialPage.tsx",
+    "ui3/src/social/social-page.css",
+    "ui3/vitest.config.ts.timestamp-1790777384406-a6d692074fe908.mjs"
+   ],
+   "landed": true,
+   "tools": 20,
+   "summary": "I added a city map with live-event pins and picture cards to web Nearby, and made event names jump \u2026",
+   "error": null,
+   "diff": [
+    " ui3/src/social/SocialPage.tsx               | 31 +++++++++++++++++++++++++++++",
+    " ui3/src/social/social-page.css              |  8 ++++++++",
+    " 5 files changed, 49 insertions(+), 4 deletions(-)"
+   ]
+  },
+  {
+   "case": "dcl-0929-claude-8",
+   "effort": "high",
+   "doneMs": 93520,
+   "writeMs": 64659,
+   "files": [
+    "ui3/src/web/pages/stblogpost.css"
+   ],
+   "landed": true,
+   "tools": 24,
+   "summary": "I made the post page's category bar match the blog home: one row with the search box on the right.",
+   "error": null,
+   "diff": [
+    "ui3/src/web/pages/stblogpost.css | 6 ++++--",
+    " 1 file changed, 4 insertions(+), 2 deletions(-)"
+   ]
+  }
+ ],
+ "notes": "high/dcl-0929-claude-8 rerun after effb2d7a9: the first run hung on a Stop hook lost to slow loopback connects, not on effort"
+}

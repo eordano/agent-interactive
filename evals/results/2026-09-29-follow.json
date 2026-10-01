@@ -1,0 +1,239 @@
+{
+ "label": "now",
+ "at": "2026-09-29T10:05:09.456Z",
+ "port": 5390,
+ "page": "https://dcl.one/",
+ "summary": {
+  "cases": 24,
+  "scored": 24,
+  "skipped": 0,
+  "request": null,
+  "lane": null,
+  "target": null,
+  "follow": {
+   "hit": 22,
+   "of": 24
+  },
+  "medianMs": 727,
+  "meanTools": null,
+  "meanPromptKB": null
+ },
+ "results": [
+  {
+   "id": "follow-01",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 706
+  },
+  {
+   "id": "follow-02",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 645
+  },
+  {
+   "id": "follow-03",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 794
+  },
+  {
+   "id": "follow-04",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 1062
+  },
+  {
+   "id": "follow-05",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 1340
+  },
+  {
+   "id": "follow-06",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 766
+  },
+  {
+   "id": "follow-07",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 499
+  },
+  {
+   "id": "follow-08",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 540
+  },
+  {
+   "id": "follow-09",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 538
+  },
+  {
+   "id": "follow-10",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 775
+  },
+  {
+   "id": "follow-11",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 1094
+  },
+  {
+   "id": "follow-12",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 476
+  },
+  {
+   "id": "follow-13",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "new",
+   "follow": false,
+   "ms": 775
+  },
+  {
+   "id": "follow-14",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 674
+  },
+  {
+   "id": "follow-15",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 486
+  },
+  {
+   "id": "follow-16",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "new",
+   "follow": false,
+   "ms": 727
+  },
+  {
+   "id": "follow-17",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 765
+  },
+  {
+   "id": "follow-18",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 1627
+  },
+  {
+   "id": "follow-19",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 654
+  },
+  {
+   "id": "follow-20",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 890
+  },
+  {
+   "id": "follow-21",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 604
+  },
+  {
+   "id": "follow-22",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 778
+  },
+  {
+   "id": "follow-23",
+   "expected": {
+    "follow": "append"
+   },
+   "relation": "append",
+   "follow": true,
+   "ms": 559
+  },
+  {
+   "id": "follow-24",
+   "expected": {
+    "follow": "new"
+   },
+   "relation": "new",
+   "follow": true,
+   "ms": 492
+  }
+ ]
+}

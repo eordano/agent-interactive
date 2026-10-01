@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>agent-interactive</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main id="setup" hidden>
+    <header class="setup-head">
+      <h1>Set up a session</h1>
+      <p>Pick the page to work on and what may change it. <b>Check setup</b> tries everything a session needs and says how to fix what is missing.</p>
+    </header>
+
+    <form id="form" autocomplete="off">
+      <section>
+        <h2>Page</h2>
+        <label class="row"><span>Folder the agents edit</span>
+          <span class="with-button"><input name="dir" required placeholder="/home/you/project"><button type="button" id="pick">Choose folder...</button></span>
+        </label>
+        <div class="row"><span>The page is</span>
+          <span class="choices">
+            <label><input type="radio" name="attach" value="1"> served by its dev server at</label>
+            <input name="url" placeholder="https://localhost:5173" class="inline">
+            <label><input type="radio" name="attach" value="0"> this folder's index.html, served here</label>
+          </span>
+        </div>
+        <label class="row"><span>Its code is under</span>
+          <input name="search" placeholder="all of the folder">
+        </label>
+        <p class="hint">Folders inside the project, separated by commas, where what you click is looked up.</p>
+      </section>
+
+      <section>
+        <h2>Agents</h2>
+        <label class="row"><span>The fast lane uses the model</span><input name="flashModel"></label>
+        <label class="row"><span>started with the command</span><input name="opencodeCmd"></label>
+        <p class="hint">The sandbox launcher opencode runs in, not the model. Its sandbox must be allowed to change files in the folder; <b>Check setup</b> tests that.</p>
+        <div class="row"><span>Key for <b id="provider">the provider</b></span>
+          <span class="with-button"><input name="key" type="password" placeholder="kept in the system keychain"><button type="button" id="save-key">Save key</button></span>
+        </div>
+        <p class="hint" id="key-note"></p>
+        <label class="row"><span>Claude agents working at once</span><input name="claudeWorkers" type="number" min="0" max="8" class="short"></label>
+        <p class="hint">Each one is an interactive Claude Code you can watch and type into. 0 keeps every change on the fast lane.</p>
+        <label class="row"><span>with the model</span><input name="claudeModel"></label>
+        <label class="row"><span>thinking at effort</span>
+          <select name="claudeEffort">
+            <option value="">Claude Code's default</option>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+            <option value="xhigh">xhigh</option>
+            <option value="max">max</option>
+          </select>
+        </label>
+      </section>
+
+      <section>
+        <h2>Voice and replies</h2>
+        <label class="row check"><input type="checkbox" name="voice"><span>Listen while I browse (recgo records the browser tab and what I say)</span></label>
+        <label class="row"><span>The browser's debugging port is</span><input name="browserPort" type="number" min="1" max="65535" class="short"></label>
+        <label class="row"><span>What I say is transcribed</span>
+          <select name="sttBackend">
+            <option value="realtime">as I speak, by the speech server</option>
+            <option value="remote">after each pause, by the speech server</option>
+            <option value="local">on this machine (Whisper)</option>
+            <option value="auto">by whichever recgo finds</option>
+          </select>
+        </label>
+        <label class="row check"><input type="checkbox" name="speech"><span>Say one sentence back after each change</span></label>
+        <label class="row"><span>using the speech server at</span><input name="ttsUrl" placeholder="https://speech.example"></label>
+      </section>
+
+      <p class="managed-note" id="managed-note" hidden></p>
+
+      <section id="checks-section" hidden>
+        <h2>Setup</h2>
+        <ol id="checks"></ol>
+      </section>
+
+      <footer class="actions">
+        <span id="setup-status" class="status"></span>
+        <button type="button" id="check">Check setup</button>
+        <button type="submit" id="start" class="primary" disabled>Start session</button>
+      </footer>
+    </form>
+  </main>
+
+  <div id="run" hidden>
+    <header class="bar">
+      <div class="where">
+        <b id="run-title"></b>
+        <span id="run-page" class="muted"></span>
+      </div>
+      <span id="run-state" class="status"></span>
+      <button id="mute" title="While muted, what you say is recorded but never acted on">Mute</button>
+      <button id="log-toggle" title="What the loop prints: every recgo line, gate verdict and change">Loop output</button>
+      <button id="stop" title="Stops every agent; recgo writes its session document first">Stop session</button>
+    </header>
+    <div class="body">
+      <aside>
+        <h3>Agents</h3>
+        <ul id="agents" class="list"></ul>
+        <h3>Waiting</h3>
+        <ul id="queue" class="list"></ul>
+        <h3>Done</h3>
+        <ul id="recent" class="list"></ul>
+      </aside>
+      <section id="view">
+        <header id="view-head">
+          <b id="view-title"></b>
+          <span id="view-doing" class="muted"></span>
+        </header>
+        <p id="attention" class="attention" hidden></p>
+        <div id="view-body"></div>
+      </section>
+    </div>
+    <pre id="log" hidden></pre>
+    <form id="say" class="composer" autocomplete="off">
+      <input name="text" placeholder="Type a change and press Enter. Start it with ! to give it to Claude.">
+      <button type="submit">Send</button>
+    </form>
+  </div>
+</body>
+</html>

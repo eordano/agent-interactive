@@ -1,0 +1,4 @@
+// Targeting cases for decentraland/sites (loop: ~/src/decentraland/sites --attach http://localhost:5173 --search src).
+// Valid against sites 9938b3e plus the 2026-09-27 session's edits. Recorded requests are reworded.
+{"id":"sites-navbar-darker","attach":"http://localhost:5173","context":["00.00.01  Navigate: http://localhost:5173/"],"said":["make the navbar background a bit darker"],"expect":{"verdict":"small","files":["src/components/LandingNavbar/LandingNavbar.styled.ts"]}}
+{"id":"sites-discord-lower","attach":"http://localhost:5173","context":["00.00.01  Navigate: http://localhost:5173/create"],"said":["Show this discord button centered and a bit lower"],"expect":{"verdict":"small","files":["src/components/Create/Connect/Connect.styled.ts"]}}

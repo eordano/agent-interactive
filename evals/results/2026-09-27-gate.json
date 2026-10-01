@@ -1,0 +1,295 @@
+{
+ "label": "2026-09-27 baseline",
+ "at": "2026-09-27T14:04:49.255Z",
+ "port": 5390,
+ "page": "https://dcl.one/",
+ "summary": {
+  "cases": 30,
+  "scored": 30,
+  "skipped": 0,
+  "request": {
+   "hit": 29,
+   "of": 30
+  },
+  "lane": {
+   "hit": 26,
+   "of": 30
+  },
+  "target": null,
+  "medianMs": null,
+  "meanTools": null,
+  "meanPromptKB": null
+ },
+ "results": [
+  {
+   "id": "demo-0919-01",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "demo-0919-02",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "demo-0919-03",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "demo-0919-04",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "demo-0919-05",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "demo-0919-06",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1143-01",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1143-02",
+   "expected": {
+    "verdict": "large"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": false
+  },
+  {
+   "id": "dcl-1143-03",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1143-04",
+   "expected": {
+    "verdict": "large"
+   },
+   "verdict": "large",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1143-05",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1143-06",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1143-07",
+   "expected": {
+    "verdict": "large"
+   },
+   "verdict": "large",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1210-01",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1210-02",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1210-03",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1210-04",
+   "expected": {
+    "verdict": "large"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": false
+  },
+  {
+   "id": "dcl-1210-05",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1210-06",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1210-07",
+   "expected": {
+    "verdict": "large"
+   },
+   "verdict": "large",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1210-08",
+   "expected": {
+    "verdict": "large"
+   },
+   "verdict": "large",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "dcl-1210-09",
+   "expected": {
+    "verdict": "large"
+   },
+   "verdict": "large",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "sites-1247-01",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "sites-1247-02",
+   "expected": {
+    "verdict": "none"
+   },
+   "verdict": "none",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "sites-1247-03",
+   "expected": {
+    "verdict": "none"
+   },
+   "verdict": "small",
+   "request": false,
+   "lane": false
+  },
+  {
+   "id": "sites-1247-04",
+   "expected": {
+    "verdict": "large"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": false
+  },
+  {
+   "id": "sites-1247-05",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "sites-1247-06",
+   "expected": {
+    "verdict": "none"
+   },
+   "verdict": "none",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "sites-1247-07",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  },
+  {
+   "id": "sites-1247-08",
+   "expected": {
+    "verdict": "small"
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true
+  }
+ ]
+}

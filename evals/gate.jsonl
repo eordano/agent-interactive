@@ -1,0 +1,67 @@
+// Lines from the sessions, reworded: each keeps the words the gate keys on (and any mishearing), not what was said.
+// Results before 2026-10-01 scored the words as said.
+{"id":"demo-0919-01","said":["going. Turn the subscribe button red."],"expect":{"verdict":"small"}}
+{"id":"demo-0919-02","said":["Remove the subtitle, it adds nothing"],"expect":{"verdict":"small"}}
+{"id":"demo-0919-03","said":["Add a subscribe button with a black background, and a cancel button next to it"],"expect":{"verdict":"small"}}
+{"id":"demo-0919-04","said":["Also put them on the right side"],"expect":{"verdict":"small"}}
+{"id":"demo-0919-05","said":["and swap their order, the other way round"],"expect":{"verdict":"small"}}
+{"id":"demo-0919-06","said":["Oh, it ended up on the left, move it to the right."],"expect":{"verdict":"small"}}
+{"id":"dcl-1143-01","said":["Replace the title Not Your Keys, Not Your World with Own Your Creations."],"expect":{"verdict":"small"}}
+{"id":"dcl-1143-02","said":["Make sure the landing doesn't use UTF-8 anywhere."],"expect":{"verdict":"large"},"notes":"rewrote 5 files and broke the build on the fast lane"}
+{"id":"dcl-1143-03","said":["Remove the free to start no download line"],"expect":{"verdict":"small"}}
+{"id":"dcl-1143-04","said":["Oh, tell Claude the part that got cut off is about connecting with the community."],"expect":{"verdict":"large"}}
+{"id":"dcl-1143-05","said":["Remove the no landlord no reset button"],"expect":{"verdict":"small"}}
+{"id":"dcl-1143-06","said":["Swap what's showing here for the center lamp."],"expect":{"verdict":"small"},"notes":"misheard"}
+{"id":"dcl-1143-07","said":["Figure out why these screenshots don't show up"],"expect":{"verdict":"large"}}
+{"id":"dcl-1210-01","said":["Let's switch something soon right now to explore"],"expect":{"verdict":"small"},"notes":"misheard: change \"Something's on right now\" to \"Explore\""}
+{"id":"dcl-1210-02","said":["Let's switch something sound right now to explore"],"expect":{"verdict":"small"},"notes":"misheard, second try"}
+{"id":"dcl-1210-03","said":["Remove paid in USD credits."],"expect":{"verdict":"small"}}
+{"id":"dcl-1210-04","said":["Rewrite all of this copy and make it about what you can really do in Decentraland."],"expect":{"verdict":"large"},"notes":"the fast lane escalated it"}
+{"id":"dcl-1210-05","said":["Replace created yourself with share your creations"],"expect":{"verdict":"small"}}
+{"id":"dcl-1210-06","said":["The styling of this play button seems off."],"expect":{"verdict":"small"},"notes":"dropped by the keyword gate on 2026-09-27"}
+{"id":"dcl-1210-07","said":["Find out why the events fail to load."],"expect":{"verdict":"large"},"notes":"dropped by the keyword gate on 2026-09-27"}
+{"id":"dcl-1210-08","said":["Recommended places shows an error too and asks me to retry"],"expect":{"verdict":"large"},"notes":"dropped by the keyword gate on 2026-09-27"}
+{"id":"dcl-1210-09","said":["While it's loading there's a LO thing on screen, make sure that works"],"expect":{"verdict":"large"},"notes":"a diagnosis; the fast lane burned 20 s on it"}
+{"id":"sites-1247-01","said":["Could we add a Linux download link?"],"expect":{"verdict":"small"},"notes":"no Linux build exists; Claude asked where to point it"}
+{"id":"sites-1247-02","said":["Hmm..."],"expect":{"verdict":"none"}}
+{"id":"sites-1247-03","said":["I don't see it, ah, there it is."],"expect":{"verdict":"none"},"notes":"self-correction, not a request"}
+{"id":"sites-1247-04","said":["if I click here in master zone around that spot it actually lands on the"],"expect":{"verdict":"large"},"notes":"a bug report: the click lands on the wrong element"}
+{"id":"sites-1247-05","said":["In the high bar I don't see the shop, create and other links"],"expect":{"verdict":"small"}}
+{"id":"sites-1247-06","said":["Right, the sidebar is fine, it all looks fine."],"expect":{"verdict":"none"}}
+{"id":"sites-1247-07","said":["Show this discord button centered and a bit lower"],"expect":{"verdict":"small"}}
+{"id":"sites-1247-08","said":["The discord button should sit centered in the larger area"],"expect":{"verdict":"small"}}
+{"id":"dcl-2132-01","said":["Make this title say Own Your Creations."],"expect":{"verdict":"small"}}
+{"id":"dcl-2132-02","said":["Every link in this marquee should go to its real action, and remove the asterisk"],"expect":{"verdict":"small"}}
+{"id":"dcl-2132-03","said":["None of these event icons have data. Check that the data is being downloaded from upstream."],"expect":{"verdict":"large"},"notes":"a diagnosis; the fast lane spent its 20 s before handing it on"}
+{"id":"dcl-2132-04","said":["Also, everything here should be clickable, a click on the image should go there."],"expect":{"verdict":"small"}}
+{"id":"dcl-2132-05","said":["Is there telemetry on load times, so we could tune this?"],"expect":{"verdict":"large"}}
+{"id":"dcl-2132-06","said":["this pin item, put it beside the up and down toggle, make sure we can do that"],"expect":{"verdict":"small"}}
+{"id":"dcl-2132-07","said":["Is that showing right?"],"expect":{"verdict":"none"}}
+{"id":"dcl-2132-08","said":["The data, no imposters here, is that a world thing?"],"expect":{"verdict":"large"},"notes":"a question about the data; the fast lane answered SKIP"}
+{"id":"dcl-2132-09","said":["The roads are not loaded, make sure the roads and all deployments get correctly downloaded"],"expect":{"verdict":"large"},"notes":"a diagnosis; lost to a budget abort during the stray-search nudge"}
+{"id":"dcl-2132-10","said":["Make the emotes wheel double the size"],"expect":{"verdict":"small"}}
+{"id":"dcl-2132-11","said":["So in that case, this"],"expect":{"verdict":"none"}}
+{"id": "dcl-0929-1215-01", "said": ["Loading these rankings takes too long."], "expect": {"verdict": "large"}}
+{"id": "dcl-0929-1216-01", "said": ["The rankings take too long to load, improve their performance."], "expect": {"verdict": "large"}}
+{"id": "dcl-0929-1212-01", "said": ["The queue is not moving, there's a flash item number 2 waiting and an idle agent not picking up queued flash items."], "expect": {"verdict": "none"}, "notes": "about the tool, not the page"}
+{"id": "dcl-0929-1237-01", "said": ["It's fine already, don't change it, no worries."], "expect": {"verdict": "none"}, "notes": "a cancellation"}
+{"id": "dcl-0929-1302-01", "said": ["después lo vemos con calma."], "expect": {"verdict": "none"}, "notes": "side talk"}
+{"id": "dcl-0929-1302-02", "said": ["Seguro que la reunión sale bien."], "expect": {"verdict": "none"}, "notes": "side talk"}
+{"id": "dcl-0929-1302-03", "said": ["cuán rápido podríamos hacer algo así"], "expect": {"verdict": "none"}, "notes": "a question for a person in the room"}
+{"id": "dcl-0929-1303-01", "said": ["Además quisiera un mute button para esto, así podemos hablar entretanto."], "expect": {"verdict": "none"}, "notes": "asks for a tool feature, not a page change"}
+{"id": "es-synthetic-01", "said": ["Cambiá el título por Hacelo tuyo"], "expect": {"verdict": "small"}, "notes": "synthetic Spanish request"}
+{"id": "es-synthetic-02", "said": ["Sacá este botón, no sirve"], "expect": {"verdict": "small"}, "notes": "synthetic Spanish request"}
+{"id": "es-synthetic-03", "said": ["Hacé el botón más grande"], "expect": {"verdict": "small"}, "notes": "synthetic Spanish request"}
+{"id": "es-synthetic-04", "said": ["Fijate por qué no cargan los eventos"], "expect": {"verdict": "large"}, "notes": "synthetic Spanish diagnosis"}
+{"id": "es-synthetic-05", "said": ["Esto tarda mucho en cargar"], "expect": {"verdict": "large"}, "notes": "synthetic Spanish performance"}
+{"id": "es-synthetic-06", "said": ["Está bien así"], "expect": {"verdict": "none"}, "notes": "synthetic Spanish approval"}
+{"id": "es-synthetic-07", "said": ["Dejalo como está"], "expect": {"verdict": "none"}, "notes": "synthetic Spanish cancellation"}
+{"id": "en-guard-01", "said": ["make the fade animation faster"], "expect": {"verdict": "small"}, "notes": "speed of an animation is a CSS change, not a performance investigation"}
+{"id": "dcl-0929-1516-01", "said": ["But..."], "expect": {"verdict": "none"}, "notes": "trailing off"}
+{"id": "dcl-0929-1517-01", "said": ["that a few of you have to..."], "expect": {"verdict": "none"}, "notes": "trailing off"}
+{"id": "dcl-0929-1518-01", "said": ["A ver..."], "expect": {"verdict": "none"}, "notes": "trailing off"}
+{"id": "dcl-0929-1516-02", "said": ["Ana, mirá, estoy probando una forma de editar Centerland en vivo con unos loops"], "expect": {"verdict": "none"}, "notes": "side talk addressed by name (a stand-in for the name that was said)"}
+{"id": "dcl-0929-1516-03", "said": ["Sí, claro. Estaba probando con la compu. Esto está codificado, pero bastante copiado."], "expect": {"verdict": "none"}, "notes": "side talk"}
+{"id": "dcl-0929-1516-04", "said": ["In price, make sure the mean and the two are padded correctly"], "expect": {"verdict": "small"}}
+{"id": "dcl-0929-1519-01", "said": ["Replace close the feed with stop scrolling"], "expect": {"verdict": "small"}}
+{"id": "dcl-0929-1513-01", "said": ["Remove this drag to rotate tooltip"], "expect": {"verdict": "small"}}

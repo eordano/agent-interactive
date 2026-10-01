@@ -1,0 +1,138 @@
+{
+ "label": "2026-09-27 baseline",
+ "at": "2026-09-27T14:05:35.512Z",
+ "port": 5390,
+ "page": "https://dcl.one/",
+ "summary": {
+  "cases": 6,
+  "scored": 6,
+  "skipped": 0,
+  "request": {
+   "hit": 6,
+   "of": 6
+  },
+  "lane": {
+   "hit": 6,
+   "of": 6
+  },
+  "target": {
+   "hit": 6,
+   "of": 6
+  },
+  "medianMs": 2516,
+  "meanTools": 0.7,
+  "meanPromptKB": 19.7
+ },
+ "results": [
+  {
+   "id": "dcl-click-subhead",
+   "expected": {
+    "verdict": "small",
+    "files": [
+     "ui3/src/web/pages/landingstory.css"
+    ]
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true,
+   "planned": "ui3/src/web/pages/landingstory.css",
+   "target": true,
+   "ms": 1759,
+   "tools": 0,
+   "promptKB": 18,
+   "answer": "ui3/src/web/pages/landingstory.css old: `font: 400 clamp(17px, 2.15vw, 23px) / 1.5 var(--ls-body);` "
+  },
+  {
+   "id": "dcl-click-cta",
+   "expected": {
+    "verdict": "small",
+    "files": [
+     "ui3/src/web/pages/landingstory.css"
+    ]
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true,
+   "planned": "ui3/src/web/pages/landingstory.css",
+   "target": true,
+   "ms": 2516,
+   "tools": 0,
+   "promptKB": 18,
+   "answer": "ui3/src/web/pages/landingstory.css old: ` padding: 17px 30px;` new: ` padding: 22px 40px;`"
+  },
+  {
+   "id": "dcl-page-discover",
+   "expected": {
+    "verdict": "small",
+    "files": [
+     "ui3/src/web/pages/siteshome.css"
+    ]
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true,
+   "planned": "ui3/src/web/pages/siteshome.css",
+   "target": true,
+   "ms": 2824,
+   "tools": 0,
+   "promptKB": 27,
+   "answer": "ui3/src/web/pages/siteshome.css Old: ``` .sh__event { display: flex; flex-direction: column; border-"
+  },
+  {
+   "id": "dcl-words-headline",
+   "expected": {
+    "verdict": "small",
+    "files": [
+     "sites/packages/core/src/lib/content/landing-stories.ts"
+    ]
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true,
+   "planned": "sites/packages/core/src/lib/content/landing-stories.ts",
+   "target": true,
+   "ms": 2080,
+   "tools": 0,
+   "promptKB": 12,
+   "answer": "sites/packages/core/src/lib/content/landing-stories.ts ` headline: \"Own Your Creations.\",` → ` headl"
+  },
+  {
+   "id": "dcl-vague-topbar",
+   "expected": {
+    "verdict": "small",
+    "files": [
+     "ui3/src/components/site-navigation.css",
+     "ui3/src/web/frames/dcltopbar.css"
+    ]
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true,
+   "planned": "ui3/src/components/site-navigation.css",
+   "target": true,
+   "ms": 13215,
+   "tools": 4,
+   "promptKB": 34,
+   "answer": "ui3/src/components/site-navigation.css Old: `--site-nav-bg: #101014;` New: `--site-nav-bg: #0b0b0f;`"
+  },
+  {
+   "id": "dcl-misheard-scene",
+   "expected": {
+    "verdict": "small",
+    "files": [
+     "ui3/src/web/pages/LandingStory.tsx",
+     "ui3/src/web/pages/landingstory.css"
+    ]
+   },
+   "verdict": "small",
+   "request": true,
+   "lane": true,
+   "planned": "ui3/src/web/pages/LandingStory.tsx",
+   "target": true,
+   "ms": 1166,
+   "tools": 0,
+   "promptKB": 9,
+   "answer": "File: ui3/src/web/pages/LandingStory.tsx Old: ``` PROOF.map((p, i) => ( <span className=\"ls__tick\" k"
+  }
+ ]
+}
