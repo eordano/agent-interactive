@@ -1,6 +1,6 @@
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Mutex;
@@ -20,12 +20,8 @@ fn home() -> PathBuf {
     std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default()
 }
 
-fn managed_path() -> PathBuf {
-    home().join(".config/agent-interactive/managed.json")
-}
-
-fn defaults_path() -> PathBuf {
-    home().join(".config/agent-interactive/defaults.json")
+fn config_file(name: &str) -> PathBuf {
+    home().join(".config/agent-interactive").join(name)
 }
 
 fn read_json(path: &Path) -> Value {
@@ -52,7 +48,7 @@ fn key_env(provider: &str) -> String {
 }
 
 fn stored_keys() -> HashMap<String, String> {
-    let managed = read_json(&managed_path());
+    let managed = read_json(&config_file("managed.json"));
     let mut providers: Vec<String> = vec!["cerebras".into(), "openrouter".into(), "openai".into(), "anthropic".into()];
     if let Some(model) = managed.get("flashModel").and_then(Value::as_str) {
         if let Some((p, _)) = model.split_once('/') {
@@ -72,8 +68,8 @@ fn stored_keys() -> HashMap<String, String> {
 fn settings_load(app: AppHandle) -> Result<Value, String> {
     Ok(json!({
         "settings": read_json(&settings_path(&app)?),
-        "managed": read_json(&managed_path()),
-        "defaults": read_json(&defaults_path()),
+        "managed": read_json(&config_file("managed.json")),
+        "defaults": read_json(&config_file("defaults.json")),
     }))
 }
 
@@ -107,9 +103,68 @@ async fn doctor(args: Vec<String>) -> Result<Value, String> {
     .map_err(|e| e.to_string())?
 }
 
+struct Line {
+    start: bool,
+    given: Option<Value>,
+}
+
+const APP_HELP: &str = "
+THE APP'S OWN ARGUMENTS
+  agent-interactive-app [DIR] [OPTIONS] [-- RECGO-TAB ARGS]
+                       the arguments above fill the setup form in place of the saved settings
+                       (values pinned by the machine still win); an option the form has no field
+                       for goes to the session as given, for that launch only
+  --start              checks the form and starts the session at once when nothing fails
+  agent-interactive-app doctor [--json] [DIR] [OPTIONS]
+                       agent-interactive doctor, with the keys the app keeps in the keychain
+";
+
+fn exit_with(status: std::io::Result<std::process::ExitStatus>) -> ! {
+    match status {
+        Ok(s) => std::process::exit(s.code().unwrap_or(1)),
+        Err(e) => {
+            eprintln!("agent-interactive-app: could not run agent-interactive: {e}");
+            std::process::exit(1)
+        }
+    }
+}
+
+fn read_line() -> Line {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let own = args.split(|a| a == "--").next().unwrap_or(&[]);
+    if own.iter().any(|a| a == "--help" || a == "-h") {
+        let status = cli().arg("--help").status();
+        if matches!(&status, Ok(s) if s.success()) {
+            print!("{APP_HELP}");
+        }
+        exit_with(status);
+    }
+    if args.first().map(String::as_str) == Some("doctor") {
+        exit_with(cli().args(&args).envs(stored_keys()).status());
+    }
+    let start = own.iter().any(|a| a == "--start");
+    let rest: Vec<&String> = args.iter().filter(|a| *a != "--start").collect();
+    if rest.is_empty() {
+        return Line { start, given: None };
+    }
+    let out = cli().arg("parse").args(&rest).stdin(Stdio::null()).output().unwrap_or_else(|e| {
+        eprintln!("agent-interactive-app: could not run agent-interactive: {e}");
+        std::process::exit(1)
+    });
+    if !out.status.success() {
+        eprint!("{}", String::from_utf8_lossy(&out.stderr));
+        std::process::exit(out.status.code().unwrap_or(1));
+    }
+    let given = serde_json::from_slice::<Value>(&out.stdout).unwrap_or_else(|e| {
+        eprintln!("agent-interactive-app: agent-interactive parse gave no JSON: {e}");
+        std::process::exit(1)
+    });
+    Line { start, given: Some(given) }
+}
+
 #[tauri::command]
-fn start_requested() -> bool {
-    std::env::args().skip(1).any(|a| a == "--start")
+fn cli_line(line: State<Line>) -> Value {
+    json!({ "start": line.start, "given": line.given })
 }
 
 #[tauri::command]
@@ -200,13 +255,6 @@ async fn loop_stop(app: AppHandle) -> Result<(), String> {
     })
     .await
     .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn loop_input(state: State<Loop>, line: String) -> Result<(), String> {
-    let mut stdin = state.stdin.lock().unwrap();
-    let pipe = stdin.as_mut().ok_or("the loop is not running")?;
-    writeln!(pipe, "{line}").map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -311,7 +359,7 @@ fn adopt_login_path() {
     if let Ok(out) = Command::new(shell).args(["-l", "-c", "printenv PATH"]).output() {
         let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
         if !path.is_empty() {
-            std::env::set_var("PATH", path);
+            unsafe { std::env::set_var("PATH", path) };
         }
     }
 }
@@ -319,18 +367,19 @@ fn adopt_login_path() {
 pub fn run() {
     #[cfg(target_os = "macos")]
     adopt_login_path();
+    let line = read_line();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Loop::default())
+        .manage(line)
         .invoke_handler(tauri::generate_handler![
             settings_load,
             settings_save,
             doctor,
-            start_requested,
+            cli_line,
             free_port,
             loop_start,
             loop_stop,
-            loop_input,
             key_set,
             key_status,
             ghostty_look

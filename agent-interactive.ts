@@ -11,9 +11,9 @@ QUICK START
   # a local page: serve DIR with its own hot reload, type changes below
   agent-interactive demo
 
-  # dcl.one in dev mode: edit the umbrella's working tree while you browse and talk
-  agent-interactive ~/dcl-one --attach https://dcl.one \\
-      --search sites/src,ui3/src --recgo -- --stt-backend realtime
+  # a site a Vite dev server already serves: edit its working tree while you browse and talk
+  agent-interactive ~/src/site --attach http://localhost:5173 \\
+      --search src --recgo -- --stt-backend realtime
 
   # send a change from anywhere and get its timings back
   curl -X POST 'localhost:5199/__ai/say?wait=1' --data 'make the title dark red'
@@ -26,6 +26,10 @@ CHECKING THE SETUP
                        whether it already trusts DIR), voice (recgo-tab and the browser's debugging
                        port) and spoken replies. Each problem comes with its fix; exits 1 if one
                        would stop the run. --json is what the app reads
+  agent-interactive parse [DIR] [OPTIONS] [-- RECGO-TAB ARGS]
+                       the options this line sets, as JSON, DIR made absolute; exits 64 with the
+                       usage message on a bad one. The app fills its form from it, so
+                       agent-interactive-app takes the same arguments as this loop
 
 GIVING INSTRUCTIONS
   a typed line         a change for the fast lane
@@ -44,11 +48,14 @@ GIVING INSTRUCTIONS
                        ?clear=1 forgets the page and clicks first
   speech (--recgo)     each narrated sentence is judged: requests and complaints ("this doesn't
                        look right") run, diagnosis ("figure out why", "error", "loading") goes
-                       to Claude, approval and chatter wait as context or are dropped
+                       to Claude, approval and chatter wait as context or are dropped; the page's
+                       status bubble and the app say what was heard and that nothing was done
 
 WHERE THE PAGE COMES FROM
-  (default)            DIR is served on --port with its own hot reload and a status pill
-  --attach URL         a Vite dev server already serves the page (https://dcl.one): nothing is
+  (default)            DIR is served on --port with its own hot reload and a status pill. A
+                       reveal.js deck keeps its slide across edits, and the slide on screen is
+                       what the fast lane is shown first
+  --attach URL         a Vite dev server already serves the page (http://localhost:5173): nothing is
                        served, its HMR socket is read and DIR is edited in place
   --search DIRS        with --attach: comma-separated dirs under DIR that hold the page's code;
                        what you click is looked up there (default: all of DIR)
@@ -60,16 +67,17 @@ AGENTS
   --flash-model P/M    fast lane model (default cerebras/qwen-3.8-27b)
   --opencode-cmd CMD   opencode launcher, started as 'CMD serve' (default opencode-bwrap; the
                        gVisor launcher is far slower on an NFS tree)
-  --opencode URL       use an opencode server that is already running instead
+  --opencode URL       use an opencode server that is already running instead (its password
+                       from OPENCODE_PASSWORD)
   --flash-budget S     seconds the fast lane gets to reach a change before it is aborted and
                        handed to Claude (default 20). The fast lane is one agent that starts a
                        fresh session for every change (pre-warmed, so it costs nothing); the
                        last few changes ride along in its prompt instead of a history
   --claude-workers N   large-change agents working at once (default 4), each an interactive Claude
                        Code in its own terminal (agent-pty), which the app shows and you can type
-                       into. A change starts beside the running ones only when the files
-                       it points at differ from theirs; one that touches a file being edited, or
-                       whose files are unknown (a bare "no, the other way"), waits its turn
+                       into. A change starts beside the running ones unless it touches a file
+                       one of them is editing; unknown files (a bare "no, the other way") hold
+                       only fast-lane changes
   --claude-cmd CMD     the large-change lane (default claude; 'none' keeps everything fast)
   --claude-model M     its model (default claude-opus-5-5)
   --claude-effort E    low, medium, high, xhigh or max: how hard each agent thinks (--effort);
@@ -91,6 +99,9 @@ LISTENING
   --recgo-port N       recgo-tab's CDP port (default 9333 for a launched browser, 9222 with --attach)
   --gate-url URL       judge narration with URL/v1/systemone instead of keywords
   --gate-model M       the model the gate asks (default auto)
+  --gate-chat          the gate URL is an OpenAI-compatible server: ask URL/v1/chat/completions for a forced
+                       tool call instead of /v1/systemone (litellm in front of TypeSafe's Jev router)
+  --gate-key-file F    the bearer token for the gate server; missing or unreadable, the gate stays on keywords
   --settle MS          a spoken request is sent once you pause: nothing heard for MS (default
                        1000; 0 sends each sentence at once), and up to 5 s more while it ends
                        mid-sentence ("...so that we can"); everything said by then is one request
@@ -99,13 +110,49 @@ LISTENING
                        asked whether the new words belong to it (a correction, a change of mind,
                        the rest of the sentence, more detail about the same thing). If they do,
                        they join it before it starts, or run next in the same agent's session
+  --origin URL         another origin whose pages may use this port (repeatable): the public name
+                       a proxy serves the page and this port under. The proxy keeps this port's
+                       own Host; the page loads /__ai/client.js from it and talks over /__hmr
+  --stt-url URL        speech-to-text server for the page's own microphone: its /v1/realtime
+                       socket transcribes as they speak (default none: the page has no Talk button)
+  --stt-model NAME     transcription model named in the session (default none: the server's own);
+                       naming one switches to OpenAI's session shape, e.g. gpt-4o-mini-transcribe
+  --speech-key-file F  file holding an API key sent to --tts-url and --stt-url (OpenAI: Bearer on
+                       speech, the openai-insecure-api-key subprotocol on the realtime socket)
+  --widget             serve the agent widget with the page client: the dot, the list of changes,
+                       each request's terminal and timeline, review and pull requests
+  --forge-url URL      Forgejo the loop pushes to and calls (e.g. https://git.example.com, or a loopback
+                       address when the public name sits behind basic auth)
+  --forge-public-url U the Forgejo name the widget opens for people (default --forge-url)
+  --forge-repo O/R     repository there (owner/name); created on the first pull request when missing
+  --forge-token-file F file holding the Forgejo access token the loop pushes and opens PRs with
+  --forge-user NAME    the Forgejo user that token belongs to (default agent)
+  --forge-base BRANCH  base branch of the pull requests (default main)
+  --forge-admin-token-file F  a Forgejo admin token (write:admin, write:user): the loop then finds the
+                       Forgejo account of a Decentraland login (by its synthetic email), makes it on the
+                       spot when there is none (name, face and description from the profile) and opens
+                       each pull request as that account (the Sudo header), with the commits in its name
+  --forge-email-domain D  the domain of those synthetic emails (default users.noreply.invalid)
+  --codex-cmd CMD      the Codex CLI for the smart lane's Codex agents (default codex; none to leave Codex out)
+  --codex-model NAME   model Codex runs with (default: the CLI's own)
+  --smart WHO          which smart agent takes the bigger changes: claude, codex or none
+                       (default claude when --claude-cmd is not none, else none); the widget can change it
+  --anthropic-key-file F  file holding an Anthropic API key handed to the Claude agents (else their own login)
+  --openai-key-file F  file holding an OpenAI API key handed to the Codex agents (default --speech-key-file)
+  --anthropic-workspace-id ID  workspace the Anthropic key's requests belong to (an organization key that is not scoped
+                       to a workspace is refused without it: sent as the anthropic-workspace-id header)
+  --settings-file F    where the widget's model choices persist across restarts (default none: memory only)
+  --hermes-url URL     the Hermes dashboard that imports this loop's records: each change links to its session there
+  --no-vad             do not serve the in-page voice detector (TEN VAD, Silero v5 as fallback; the speech server's own turn detection then ends a request)
 
 SPEAKING
   --say WHAT           speaches (default): TTS from --tts-url played with pw-play (afplay on a Mac,
-                       spd-say or say when the server fails); none; or a
+                       spd-say or say when the server fails); page: the same audio played in the
+                       page (its own voice when the server fails); none; or a
                        command run as CMD "<summary>"
-  --tts-url URL        speech endpoint base (default http://localhost:8000)
-  --tts-voice V        voice (default af_heart)
+  --tts-url URL        speech endpoint base (default $AGENT_INTERACTIVE_TTS_URL, else http://127.0.0.1:8000)
+  --tts-model NAME     model named on /v1/audio/speech (default kokoro; OpenAI: gpt-4o-mini-tts)
+  --tts-voice V        voice (default af_heart; OpenAI voices are alloy, nova, marin, ...)
   --tts-speed X        0.5 to 2.0 (default 2.0)
 
 OUTPUT
@@ -119,7 +166,7 @@ OUTPUT
   GET /__ai/jobs       the last 20 as JSON
   GET /__ai/page       the route and files the loop takes the current page (or ?url=) to be
   POST /__ai/relation  {"prev", "said", "running"?: "claude"|"queued"}: the follow-up check alone
-                       (evals/follow.jsonl)
+                       (follow-up cases, see evals/example.jsonl)
   --no-toast           no status pill in a served page
 
 Ctrl-C stops everything; recgo-tab writes its session document first.`;
@@ -135,8 +182,10 @@ function usage(msg: string): never {
 }
 
 const OPTIONS = ["--port", "--attach", "--search", "--opencode", "--opencode-cmd", "--flash-model", "--flash-budget", "--claude-workers",
-  "--claude-cmd", "--claude-model", "--claude-effort", "--recgo", "--recgo-port", "--gate-url", "--gate-model", "--say",
-  "--tts-url", "--tts-voice", "--tts-speed", "--log", "--trajectories", "--no-toast", "--settle", "--no-follow-up", "--help"];
+  "--claude-cmd", "--claude-model", "--claude-effort", "--recgo", "--recgo-port", "--gate-url", "--gate-model", "--gate-key-file", "--say",
+  "--tts-url", "--tts-voice", "--tts-speed", "--log", "--trajectories", "--no-toast", "--settle", "--no-follow-up", "--origin",
+  "--stt-url", "--stt-model", "--tts-model", "--speech-key-file", "--widget", "--forge-url", "--forge-public-url", "--forge-repo", "--forge-token-file",
+  "--forge-user", "--forge-base", "--forge-admin-token-file", "--forge-email-domain", "--codex-cmd", "--codex-model", "--smart", "--anthropic-key-file", "--openai-key-file", "--anthropic-workspace-id", "--settings-file", "--hermes-url", "--no-vad", "--help"];
 const RECGO_FLAGS = /^--?(stt-|headless|no-audio|mic|live|system-audio|out|duration|match|launch|portal|title-|whisper-|no-sync|sync-target|keep-raw|json)/;
 
 function unknownOption(a: string): string {
@@ -164,11 +213,14 @@ function parseArgs(raw: string[]) {
     claudeModel: "claude-opus-5-5",
     gateUrl: "",
     gateModel: "auto",
+    gateChat: false,
+    gateKeyFile: "",
     recgo: false,
     recgoPort: 0,
     recgoArgs: [] as string[],
     say: "speaches",
-    ttsUrl: "http://localhost:8000",
+    ttsUrl: Deno.env.get("AGENT_INTERACTIVE_TTS_URL") || "http://127.0.0.1:8000",
+    ttsModel: "kokoro",
     ttsVoice: "af_heart",
     ttsSpeed: 2.0,
     flashBudget: 20,
@@ -178,7 +230,29 @@ function parseArgs(raw: string[]) {
     followUp: true,
     log: "",
     toast: true,
+    origins: [] as string[],
+    sttUrl: "",
+    sttModel: "",
+    speechKeyFile: "",
+    widget: false,
+    forgeUrl: "",
+    forgePublicUrl: "",
+    forgeRepo: "",
+    forgeTokenFile: "",
+    forgeUser: "agent",
+    forgeBase: "main",
+    forgeAdminTokenFile: "",
+    forgeEmailDomain: "users.noreply.invalid",
+    codexCmd: "codex",
+    codexModel: "",
+    smart: "",
+    anthropicKeyFile: "",
+    openaiKeyFile: "",
+    anthropicWorkspaceId: "",
+    settingsFile: "",
     trajectories: "",
+    hermesUrl: "",
+    vad: true,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -199,6 +273,7 @@ function parseArgs(raw: string[]) {
         if (!/^[^/\s]+\/\S+$/.test(o.flashModel)) usage(`--flash-model wants provider/model, e.g. cerebras/qwen-3.8-27b (got ${o.flashModel})`);
         break;
       case "--tts-url": o.ttsUrl = url(); break;
+      case "--tts-model": o.ttsModel = val(); break;
       case "--tts-voice": o.ttsVoice = val(); break;
       case "--tts-speed": {
         const x = Number(val());
@@ -213,16 +288,50 @@ function parseArgs(raw: string[]) {
         break;
       case "--gate-url": o.gateUrl = url(); break;
       case "--gate-model": o.gateModel = val(); break;
+      case "--gate-chat": o.gateChat = true; break;
+      case "--gate-key-file": o.gateKeyFile = val(); break;
       case "--recgo": o.recgo = true; break;
       case "--recgo-port": o.recgoPort = num(); break;
       case "--say": o.say = val(); break;
       case "--flash-budget": o.flashBudget = num(); break;
       case "--claude-workers": o.claudeWorkers = num(); break;
-      case "--settle": o.settle = num(); break;
+      case "--settle": {
+        const n = Number(val());
+        o.settle = Number.isInteger(n) && n >= 0 ? n : usage(`--settle needs a whole number of milliseconds, 0 or more (got ${argv[i]})`);
+        break;
+      }
       case "--no-follow-up": o.followUp = false; break;
       case "--log": o.log = val(); break;
       case "--trajectories": o.trajectories = val(); break;
       case "--no-toast": o.toast = false; break;
+      case "--origin": o.origins.push(url().replace(/\/+$/, "")); break;
+      case "--stt-url": o.sttUrl = url().replace(/\/+$/, ""); break;
+      case "--stt-model": o.sttModel = val(); break;
+      case "--speech-key-file": o.speechKeyFile = val(); break;
+      case "--widget": o.widget = true; break;
+      case "--forge-url": o.forgeUrl = url(); break;
+      case "--forge-public-url": o.forgePublicUrl = url(); break;
+      case "--forge-repo":
+        o.forgeRepo = val();
+        if (!/^[\w.-]+\/[\w.-]+$/.test(o.forgeRepo)) usage(`--forge-repo wants owner/name (got ${o.forgeRepo})`);
+        break;
+      case "--forge-token-file": o.forgeTokenFile = val(); break;
+      case "--forge-user": o.forgeUser = val(); break;
+      case "--forge-base": o.forgeBase = val(); break;
+      case "--forge-admin-token-file": o.forgeAdminTokenFile = val(); break;
+      case "--forge-email-domain": o.forgeEmailDomain = val(); break;
+      case "--codex-cmd": o.codexCmd = val(); break;
+      case "--codex-model": o.codexModel = val(); break;
+      case "--smart":
+        o.smart = val();
+        if (!/^(claude|codex|none)$/.test(o.smart)) usage(`--smart is claude, codex or none (got ${o.smart})`);
+        break;
+      case "--anthropic-key-file": o.anthropicKeyFile = val(); break;
+      case "--openai-key-file": o.openaiKeyFile = val(); break;
+      case "--anthropic-workspace-id": o.anthropicWorkspaceId = val(); break;
+      case "--settings-file": o.settingsFile = val(); break;
+      case "--hermes-url": o.hermesUrl = url(); break;
+      case "--no-vad": o.vad = false; break;
       case "--": o.recgoArgs = argv.slice(i + 1); i = argv.length; break;
       case "-h":
       case "--help":
@@ -237,6 +346,19 @@ function parseArgs(raw: string[]) {
     }
   }
   return o;
+}
+
+if (Deno.args[0] === "parse") {
+  const given = parseArgs(Deno.args.slice(1));
+  const base = parseArgs([]);
+  const set = Object.fromEntries(Object.entries(given).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(base[k as keyof typeof base])));
+  try {
+    set.dir = Deno.realPathSync(given.dir);
+  } catch {
+    set.dir = given.dir;
+  }
+  console.log(JSON.stringify(set));
+  Deno.exit(0);
 }
 
 const doctorMode = Deno.args[0] === "doctor";
@@ -283,7 +405,7 @@ const absolute = (p: string) => p && p !== "none" && !p.startsWith("/") ? `${Den
 o.log = absolute(o.log);
 o.trajectories = absolute(o.trajectories);
 Deno.chdir(root);
-if (o.attach && !/^https?:\/\//.test(o.attach)) usage(`--attach wants the page's URL, e.g. https://dcl.one (got ${o.attach})`);
+if (o.attach && !/^https?:\/\//.test(o.attach)) usage(`--attach wants the page's URL, e.g. http://localhost:5173 (got ${o.attach})`);
 const searchDirs = o.search ? o.search.split(",").map((s) => s.trim()).filter(Boolean) : ["."];
 for (const d of o.search ? searchDirs : []) {
   try {
@@ -293,9 +415,61 @@ for (const d of o.search ? searchDirs : []) {
   }
 }
 const pageUrl = o.attach ? `${o.attach}/` : `http://localhost:${o.port}/`;
+const PAGE_ORIGINS = new Set([pageUrl, ...o.origins].map((u) => new URL(u).origin));
+function ownPage(url: string): boolean {
+  try {
+    return PAGE_ORIGINS.has(new URL(url).origin);
+  } catch {
+    return false;
+  }
+}
+const offPage = () => !!lastPage && !ownPage(lastPage);
+const WIDGET_CLICK = /\bai-(widget|status|talk)\b/;
 const tmp = Deno.env.get("TMPDIR") ?? "/tmp";
 const logPath = o.log || `${tmp}/agent-interactive-${o.port}.jsonl`;
 const JSON_H = { "content-type": "application/json" };
+
+// Key files are read through the path given on the command line, never canonicalized and never
+// cached for good: an agenix rekey swaps /run/agenix.d/<generation> under the stable /run/agenix
+// link, the service sandbox sees only the stable path, and a loop that resolved or cached the old
+// generation would keep failing until restarted. Each read is cached by mtime for a short while
+// and the last good value survives a transient read error.
+const keyCache = new Map<string, { at: number; mtime: number; value: string }>();
+function keyFrom(file: string, label = file): string {
+  if (!file) return "";
+  const now = Date.now();
+  const hit = keyCache.get(file);
+  if (hit && now - hit.at < 5000) return hit.value;
+  let mtime = 0;
+  try {
+    mtime = Deno.statSync(file).mtime?.getTime() ?? 0;
+  } catch (e) {
+    if (hit) return hit.value;
+    say(`${label}: ${errText(e)}`);
+    return "";
+  }
+  if (hit && hit.mtime === mtime) { hit.at = now; return hit.value; }
+  try {
+    const value = Deno.readTextFileSync(file).trim();
+    keyCache.set(file, { at: now, mtime, value });
+    return value;
+  } catch (e) {
+    if (hit) return hit.value;
+    say(`${label}: ${errText(e)}`);
+    return "";
+  }
+}
+function speechKey(): string {
+  return keyFrom(o.speechKeyFile, `--speech-key-file ${o.speechKeyFile}`);
+}
+function openaiKey(): string {
+  return keyFrom(o.openaiKeyFile || o.speechKeyFile);
+}
+
+function speechHeaders(): Record<string, string> {
+  const key = speechKey();
+  return key ? { ...JSON_H, authorization: `Bearer ${key}` } : JSON_H;
+}
 const enc = new TextEncoder();
 
 type Route = "flash" | "opus" | "flash→opus";
@@ -317,6 +491,7 @@ type Job = {
   reply?: string;
   summary?: string;
   error?: string;
+  smartDown?: boolean;
   escalated?: boolean;
   retried?: boolean;
   nudged?: boolean;
@@ -324,7 +499,6 @@ type Job = {
   follows?: Job;
   pin?: string;
   sid?: string;
-  question?: boolean;
   settleMs?: number;
   hints?: string;
   cancelled?: boolean;
@@ -339,11 +513,26 @@ type Job = {
   named?: string[];
   hintFiles?: { file: string; why: string }[];
   page?: string;
+  pageRoute?: string | null;
+  pageFiles?: string[];
   clicks?: string[];
   trace?: { tool: string; what: string; ms?: number; status?: string }[];
   edits?: { file: string; old?: string; new?: string; bytes?: number }[];
   hmrError?: string;
   ttsMs?: number;
+  reverted?: boolean;
+  pr?: { number: number; url: string };
+  who?: { address: string; name: string };
+  log?: { t: number; text: string }[];
+  deleted?: boolean;
+  hermes?: string;
+  logRecord?: string;
+  trajRecord?: string;
+  retryOf?: number;
+  retriedAs?: number;
+  editOf?: number;
+  triedCodex?: boolean;
+  lane?: string;
   appliedSignal: PromiseWithResolvers<void>;
   hmrSignal: PromiseWithResolvers<void>;
   finished: PromiseWithResolvers<Job>;
@@ -368,8 +557,115 @@ function send(msg: unknown) {
   for (const c of clients) if (c.readyState === WebSocket.OPEN) c.send(s);
 }
 
+const bootAt = Date.now();
+function stamp(): string {
+  const t = Math.round((Date.now() - bootAt) / 1000);
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `${two(Math.floor(t / 3600))}.${two(Math.floor(t / 60) % 60)}.${two(t % 60)}`;
+}
+
+function b64(b: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+function micSocket(req: Request): Response {
+  if (!o.sttUrl) return json({ error: "no --stt-url: the page's microphone is off" }, 404);
+  const speaker = sessions.get(new URL(req.url).searchParams.get("token") ?? "");
+  const who: Who | null = speaker ? { address: speaker.address, name: speaker.name } : null;
+  const { socket, response } = Deno.upgradeWebSocket(req);
+  socket.binaryType = "arraybuffer";
+  const key = speechKey();
+  const up = new WebSocket(`${o.sttUrl.replace(/^http/, "ws")}/v1/realtime?intent=transcription`,
+    key ? ["realtime", `openai-insecure-api-key.${key}`] : []);
+  const partials = new Map<string, string>();
+  let told = false;
+  up.onopen = () => {
+    const vad = { type: "server_vad", create_response: false, interrupt_response: false, threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 900 };
+    up.send(JSON.stringify(o.sttModel
+      ? { type: "session.update", session: { type: "transcription", audio: { input: { format: { type: "audio/pcm", rate: 24000 }, transcription: { model: o.sttModel }, turn_detection: vad } } } }
+      : { type: "session.update", session: { turn_detection: vad, input_audio_format: "pcm16", output_audio_format: "pcm16" } }));
+    say("a page's microphone is on");
+  };
+  up.onmessage = (e) => {
+    let ev: { type?: string; item_id?: string; transcript?: string; text?: string; delta?: string; error?: unknown };
+    try {
+      ev = JSON.parse(String(e.data));
+    } catch {
+      return;
+    }
+    const id = ev.item_id ?? "";
+    switch (ev.type) {
+      case "error":
+        say(`speech server: ${clip(JSON.stringify(ev.error), 160)}`);
+        break;
+      case "input_audio_buffer.partial_transcription":
+      case "conversation.item.input_audio_transcription.delta": {
+        const said = ev.type.endsWith(".delta") ? (partials.get(id) ?? "") + (ev.delta ?? "") : (ev.transcript || ev.text || "");
+        partials.set(id, said);
+        if (said.trim()) {
+          onRecgoLine(`${stamp()}  hearing: ${said.trim()}`);
+          send({ ai: "hearing", text: clip(said.trim(), 120), who: who?.name ?? null });
+        }
+        break;
+      }
+      case "conversation.item.input_audio_transcription.completed": {
+        partials.delete(id);
+        const said = (ev.transcript ?? "").trim();
+        if (said) {
+          saidBy(said, who);
+          onRecgoLine(`${stamp()}  **user narration**: ${said}`);
+        }
+        break;
+      }
+    }
+  };
+  up.onerror = () => {
+    if (!told) say(`could not reach the speech server at ${o.sttUrl}`);
+    told = true;
+  };
+  up.onclose = () => {
+    if (socket.readyState === WebSocket.OPEN) socket.close();
+  };
+  let manual = false;
+  socket.onmessage = (e) => {
+    if (up.readyState !== WebSocket.OPEN) return;
+    if (typeof e.data === "string") {
+      // the page's own voice-activity detector (TEN VAD or Silero) talks in small JSON frames; the speech server
+      // then stops waiting for its own 900 ms of silence: the page commits the turn the moment speech ends
+      let m: { vad?: string } = {};
+      try { m = JSON.parse(e.data); } catch { return; }
+      if (m.vad === "ready" && !manual) {
+        manual = true;
+        up.send(JSON.stringify(o.sttModel
+          ? { type: "session.update", session: { type: "transcription", audio: { input: { turn_detection: null } } } }
+          : { type: "session.update", session: { turn_detection: null } }));
+        say("a page's voice detector is on: turns end with it, not with the speech server's silence timer");
+      } else if (m.vad === "end" && manual) {
+        up.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
+        vadEndAt = now();
+        trace({ type: "vad", end: true });
+      } else if (m.vad === "start") {
+        vadStartAt = now();
+      } else if (m.vad === "stopped") {
+        say(`a page's microphone stopped itself: ${String((m as { why?: string }).why ?? "")}`);
+        trace({ type: "mic", stopped: String((m as { why?: string }).why ?? "") });
+      }
+      return;
+    }
+    if (!(e.data instanceof ArrayBuffer)) return;
+    up.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64(new Uint8Array(e.data)) }));
+  };
+  socket.onclose = () => {
+    say("a page's microphone is off");
+    if (up.readyState <= WebSocket.OPEN) up.close();
+  };
+  return response;
+}
+
 function status(job: Job, phase: string, msg: string) {
-  send({ ai: "status", id: job.id, phase, msg });
+  send({ ai: "status", id: job.id, phase, msg, change: changeRow(job) });
 }
 
 function newJob(source: string, text: string, route: Route): Job {
@@ -384,6 +680,7 @@ function newJob(source: string, text: string, route: Route): Job {
     hmrSignal: Promise.withResolvers<void>(),
     finished: Promise.withResolvers<Job>(),
   };
+  job.who = whoSaid(text);
   jobs.push(job);
   if (jobs.length > 200) jobs.shift();
   return job;
@@ -397,9 +694,14 @@ function enqueue(source: string, text: string, gateMs?: number, dry = false): Jo
   job.dry = dry;
   say(`#${job.id} heard (${source}): ${clip(body, 100)}`);
   status(job, "working", `…${clip(body, 60)}`);
+  return prepareThenSubmit(job);
+}
+
+function prepareThenSubmit(job: Job): Job {
   preparing.add(job);
   prepare(job).catch(() => {}).finally(() => {
     preparing.delete(job);
+    if (job.follows) bindFollow(job);
     submit(job);
   });
   return job;
@@ -408,27 +710,26 @@ function enqueue(source: string, text: string, gateMs?: number, dry = false): Jo
 const EDITABLE = /\.(html?|css|m?js|jsx|tsx?|svg|json)$/i;
 const skipped = (rel: string) => rel.split("/").some((s) => s.startsWith(".") || s === "node_modules");
 
-async function projectFiles(limit = 64_000): Promise<string> {
+async function projectFiles(limit = 64_000): Promise<string | undefined> {
   const out: string[] = [];
   let total = 0;
-  const walk = async (dir: string, depth: number) => {
+  const walk = async (dir: string, depth: number): Promise<boolean> => {
     for await (const e of Deno.readDir(dir)) {
       const abs = `${dir}/${e.name}`;
       const rel = abs.slice(root.length + 1);
       if (skipped(rel)) continue;
-      if (e.isDirectory && depth < 3) await walk(abs, depth + 1);
-      else if (e.isFile && EDITABLE.test(e.name)) {
+      if (e.isDirectory && depth < 3) {
+        if (!await walk(abs, depth + 1)) return false;
+      } else if (e.isFile && EDITABLE.test(e.name)) {
         const text = await Deno.readTextFile(abs);
-        if (total + text.length > limit) out.push(`=== ${rel} === (not shown: over the prompt budget)\n`);
-        else {
-          total += text.length;
-          out.push(`=== ${rel} ===\n${text}\n`);
-        }
+        total += text.length;
+        if (total > limit) return false;
+        out.push(`=== ${rel} ===\n${text}\n`);
       }
     }
+    return true;
   };
-  await walk(root, 0);
-  return out.sort().join("\n");
+  return await walk(root, 0) ? out.sort().join("\n") : undefined;
 }
 
 function recentChanges(): string {
@@ -472,13 +773,12 @@ function clickTokens(): string[] {
   return out.slice(0, 5);
 }
 
+const GAP = "(?:\\s|&nbsp;|<[^>]{0,120}>)+";
+const phraseRegex = (p: string) => p.split(/\s+/).filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(GAP);
+
 async function rg(args: string[]): Promise<string[]> {
   const out = await new Deno.Command("rg", { args, cwd: root, stdout: "piped", stderr: "null" }).output().catch(() => undefined);
   return out ? new TextDecoder().decode(out.stdout).split("\n").filter(Boolean).map((l) => l.replace(/^\.\//, "")) : [];
-}
-
-async function rgFiles(token: string): Promise<string[]> {
-  return (await rg(["-l", "-F", "--glob", "*.{css,scss,tsx,ts,jsx,js,html}", "--", token, ...searchDirs])).slice(0, 3);
 }
 
 const STOP = new Set(("a an and are as at be but by can could do does for from get go had has have here how i if in into " +
@@ -503,9 +803,9 @@ function phraseTiers(text: string): string[][] {
   return tiers.map((t) => [...new Set(t)].slice(0, 6));
 }
 
-function clickFiles(): Promise<{ rel: string; token: string }[]> {
-  return Promise.all(clickTokens().map(async (t) => ({ t, files: await rgFiles(t).catch(() => []) })))
-    .then((hits) => hits.flatMap(({ t, files }) => files.map((rel) => ({ rel, token: t }))));
+async function clickFiles(): Promise<{ rel: string; token: string }[]> {
+  return (await Promise.all(clickTokens().map(async (token) =>
+    (await rg(["-l", "-F", "--glob", "*.{css,scss,tsx,ts,jsx,js,html}", "--", token, ...searchDirs])).slice(0, 3).map((rel) => ({ rel, token }))))).flat();
 }
 
 const RG_SOURCE = ["--glob", "*.{css,scss,tsx,ts,jsx,js,html,json}", "--glob", "!**/build/**", "--glob", "!**/dist/**",
@@ -513,13 +813,13 @@ const RG_SOURCE = ["--glob", "*.{css,scss,tsx,ts,jsx,js,html,json}", "--glob", "
 
 function rgTier(ps: string[], perFile: number): Promise<string[]> {
   if (!ps.length) return Promise.resolve([]);
-  return rg(["-n", "-i", "-F", "--max-count", String(perFile), "--max-columns", "180", "--max-columns-preview", ...RG_SOURCE,
-    ...ps.flatMap((p) => ["-e", p]), "--", ...searchDirs]);
+  return rg(["-n", "-i", "--max-count", String(perFile), "--max-columns", "180", "--max-columns-preview", ...RG_SOURCE,
+    ...ps.flatMap((p) => ["-e", phraseRegex(p)]), "--", ...searchDirs]);
 }
 
 type Hit = { lines: number[]; literal: boolean };
 
-async function wordHits(text: string): Promise<{ lines: string; strong: Map<string, Hit> }> {
+async function wordHits(text: string, prefer?: Set<string>): Promise<{ lines: string; strong: Map<string, Hit> }> {
   const tiers = phraseTiers(text);
   const found = await Promise.all(tiers.map((t, i) => rgTier(t, i === 0 ? 8 : 4)));
   const shown = found.flatMap((lines, i) => lines.slice(0, [10, 5, 3][i]));
@@ -537,8 +837,9 @@ async function wordHits(text: string): Promise<{ lines: string; strong: Map<stri
     hit.literal ||= asText(l.split(":").slice(2).join(":"));
     byFile.set(f, hit);
   }
-  const strong = new Map([...byFile].sort((x, y) => Number(y[1].literal) - Number(x[1].literal) || y[1].lines.length - x[1].lines.length)
-    .slice(0, 3));
+  const preferred = (f: string) => Number(prefer?.has(f) ?? false);
+  const strong = new Map([...byFile].sort((x, y) => preferred(y[0]) - preferred(x[0]) ||
+    Number(y[1].literal) - Number(x[1].literal) || y[1].lines.length - x[1].lines.length).slice(0, 3));
   return { lines: shown.length ? `Lines that contain their words (file:line:text):\n${shown.join("\n")}\n\n` : "", strong };
 }
 
@@ -677,7 +978,38 @@ async function importsOf(rel: string): Promise<string[]> {
   return out;
 }
 
+async function staticPage(url: string): Promise<{ route?: string; files: string[] }> {
+  let rel: string;
+  try {
+    rel = normalize(decodeURIComponent(new URL(url).pathname));
+    if (!rel || (await Deno.stat(`${root}/${rel}`)).isDirectory) rel = rel ? `${rel}/index.html` : "index.html";
+  } catch {
+    return { files: [] };
+  }
+  const text = await Deno.readTextFile(`${root}/${rel}`).catch(() => "");
+  if (!/\.html?$/i.test(rel) || !text) return { files: [] };
+  const base = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : ".";
+  const css = [...text.matchAll(/<link\b[^>]*\brel=["']?stylesheet[^>]*>/gi)]
+    .map((m) => m[0].match(/\bhref=["']?([^"'\s>?#]+)/i)?.[1] ?? "")
+    .filter((h) => h && !/^([a-z]+:|\/\/)/i.test(h))
+    .map((h) => normalize(h.startsWith("/") ? h : `${base}/${h}`))
+    .filter((f) => !skipped(f) && !f.split("/").includes("dist"));
+  return { route: rel, files: [rel, ...new Set(css)] };
+}
+
+let slide: { page: string; title: string; text: string } | undefined;
+
+async function slideHits(page: string): Promise<number[]> {
+  if (!slide || !samePath(slide.page, lastPage)) return [];
+  const words = (slide.title || slide.text).split(/\s+/).filter(Boolean).slice(0, 8);
+  if (!words.length) return [];
+  const lines = await rg(["-n", "--no-filename", "-i", "--max-count", "3", "-e", phraseRegex(words.join(" ")), "--", page]);
+  return lines.map((l) => Number(l.split(":")[0])).filter((n) => n > 0);
+}
+
 async function pageFiles(url: string): Promise<{ route?: string; files: string[] }> {
+  if (!ownPage(url)) return { files: [] };
+  if (!o.attach) return staticPage(url);
   let route: string | undefined;
   try {
     route = routeFor(new URL(url).pathname);
@@ -718,11 +1050,31 @@ let tabCdp: { port: number; id: string } | undefined;
 let screenCache: { at: number; lines: string[] } | undefined;
 
 let screenOverride: string[] | undefined;
+const screenWaiters: ((text: string) => void)[] = [];
+
+function screenLinesOf(text: string): string[] {
+  return [...new Set(text.split("\n").map((l) => l.trim().replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2"))
+    .filter((l) => l.length >= 3 && l.length <= 140))].slice(0, 800);
+}
 
 async function screenLines(): Promise<string[]> {
   if (screenOverride) return screenOverride;
-  if (!tabCdp) return [];
   if (screenCache && now() - screenCache.at < 1500) return screenCache.lines;
+  if (!tabCdp) {
+    if (!clients.size) return [];
+    const text = await new Promise<string>((resolve) => {
+      screenWaiters.push(resolve);
+      send({ ai: "screen" });
+      setTimeout(() => {
+        const i = screenWaiters.indexOf(resolve);
+        if (i >= 0) screenWaiters.splice(i, 1);
+        resolve("");
+      }, 1500);
+    });
+    const lines = screenLinesOf(text);
+    screenCache = { at: now(), lines };
+    return lines;
+  }
   const { port, id } = tabCdp;
   const list = await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(800) })).json();
   const url = (list as { id: string; webSocketDebuggerUrl?: string }[]).find((t) => t.id === id)?.webSocketDebuggerUrl;
@@ -747,8 +1099,7 @@ async function screenLines(): Promise<string[]> {
       reject(new Error("could not reach the tab"));
     };
   });
-  const lines = [...new Set(text.split("\n").map((l) => l.trim().replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2"))
-    .filter((l) => l.length >= 3 && l.length <= 140))].slice(0, 800);
+  const lines = screenLinesOf(text);
   screenCache = { at: now(), lines };
   return lines;
 }
@@ -777,13 +1128,14 @@ function onScreen(text: string, lines: string[]): string[] {
   return lines.map((line) => {
     const lw = words(line);
     const hit = lw.filter((w) => said.some((x) => close(x, w))).length;
-    return { line, hit, score: lw.length ? hit / lw.length : 0, n: lw.length };
-  }).filter((x) => x.n <= 16 && x.score >= 0.6 && (x.hit >= 2 || (x.n === 1 && x.line.length >= 6)))
+    const exact = lw.filter((w) => said.includes(w)).length;
+    return { line, hit, exact, score: lw.length ? hit / lw.length : 0, n: lw.length };
+  }).filter((x) => x.n <= 16 && x.score >= 0.6 && (x.hit >= 2 || (x.n === 1 && x.exact === 1 && x.line.length >= 6)))
     .sort((a, b) => b.hit - a.hit || b.score - a.score || a.line.length - b.line.length).slice(0, 3).map((x) => x.line);
 }
 
 function looseRegex(line: string): string {
-  return line.split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/['’‘]/g, ".?")).join("\\s+");
+  return line.split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/['’‘]/g, ".?")).join(GAP);
 }
 
 async function screenHits(text: string): Promise<{ named: string[]; strong: Map<string, Hit>; lines: string[] }> {
@@ -808,12 +1160,21 @@ async function screenHits(text: string): Promise<{ named: string[]; strong: Map<
 async function prepare(job: Job) {
   job.page = lastPage;
   job.clicks = [...clicks];
-  const [words, clicked, page, screen] = await Promise.all([
-    wordHits(job.text), clickFiles(), o.attach && lastPage ? pageFiles(lastPage) : Promise.resolve({ files: [] as string[] }),
-    screenHits(job.text),
+  const pageFound = lastPage ? pageFiles(lastPage) : Promise.resolve({ route: undefined, files: [] as string[] });
+  const served = o.attach ? undefined : await pageFound;
+  const [words, clicked, page, screen, onSlide] = await Promise.all([
+    wordHits(job.text, served && new Set(served.files)), clickFiles(), pageFound, screenHits(job.text),
+    served?.route ? slideHits(served.route) : Promise.resolve([] as number[]),
   ]);
   const onPage = new Set(page.files);
+  job.pageRoute = page.route ?? null;
+  job.pageFiles = [...page.files];
   const ctx: Context = { files: new Map(), why: new Map(), notes: [], bytes: 0 };
+  if (onSlide.length && page.route) {
+    const route = page.route;
+    const also = [screen.strong.get(route), words.strong.get(route)].flatMap((h) => h?.lines ?? []);
+    await addFile(ctx, route, `holds the slide on screen${also.length ? " and their words" : ""}`, [...onSlide, ...also]);
+  }
   for (const [rel, h] of screen.strong) await addFile(ctx, rel, "holds the on-screen text they named", h.lines);
   for (const { rel, token } of clicked.slice(0, 4)) await addFile(ctx, rel, `holds "${token}", what they last clicked`);
   const hits = [...words.strong];
@@ -823,9 +1184,11 @@ async function prepare(job: Job) {
   }
   const last = lastChange();
   const target = new Set(ctx.files.keys());
-  for (const rel of last?.files ?? []) await addFile(ctx, rel, `edited by the change just before (#${last!.id})`);
-  const likely = [...ctx.files.keys()];
-  const pageCap = likely.length ? 0 : PAGE_BUDGET;
+  for (const rel of last?.files ?? []) {
+    if (/\.html?$/i.test(rel) && page.route && !onPage.has(rel)) continue;
+    await addFile(ctx, rel, `edited by the change just before (#${last!.id})`);
+  }
+  const pageCap = ctx.files.size ? 0 : PAGE_BUDGET;
   for (const rel of page.files) {
     if (ctx.bytes >= pageCap) break;
     await addFile(ctx, rel, "part of the page they are on", [], pageCap);
@@ -837,10 +1200,7 @@ async function prepare(job: Job) {
     (ctx.files.size ? `Current content of the files most likely involved:\n${[...ctx.files.values()].join("\n")}\n` : "") +
     (ctx.notes.length ? `Also relevant, not shown: ${ctx.notes.join("; ")}\n\n` : "");
   job.footprint = target.size ? target : words.strong.size ? new Set(words.strong.keys()) : null;
-  if (isQuestion(job.text)) {
-    job.question = true;
-    job.footprint = new Set();
-  }
+  if (isQuestion(job.text)) job.footprint = new Set();
   job.named = screen.named;
   job.screen = screen.lines.slice(0, 300);
   job.hintFiles = [...ctx.why].map(([file, why]) => ({ file, why }));
@@ -848,9 +1208,11 @@ async function prepare(job: Job) {
 }
 
 async function flashPrompt(job: Job): Promise<string> {
-  if (o.attach) {
-    return `You are live-editing ${pageUrl} while its owner watches it and talks to you. A Vite dev server serves it from ${root} and hot-reloads every save.
-The page's code is under ${searchDirs.join(", ")}. The file contents below are current: when they hold what to change, edit them straight away without reading them again. Only when what you need is not below, grep for it inside those directories (never the whole tree) and read just that; never glob, list, run commands or ask questions.
+  if (!inlineAll) {
+    const server = o.attach ? "A Vite dev server serves it" : "It is served";
+    const dirs = o.attach || !searchDirs.includes(".") ? searchDirs.join(", ") : root;
+    return `You are live-editing ${pageUrl} while its owner watches it and talks to you. ${server} from ${root} and hot-reloads every save.
+The page's code is under ${dirs}. The file contents below are current: when they hold what to change, edit them straight away without reading them again. Only when what you need is not below, grep for it inside those directories (never the whole tree) and read just that; never glob, list, run commands or ask questions.
 ${RULES}
 
 ${ask(job)}`;
@@ -859,7 +1221,7 @@ ${ask(job)}`;
 Project directory: ${root}. The file contents below are current: edit them with the edit tool directly; never read, search, run commands or ask questions.
 ${RULES}
 
-${recentChanges()}${contextBlock()}${await projectFiles()}
+${recentChanges()}${contextBlock()}${await projectFiles() ?? ""}
 They said: "${job.text}"`;
 }
 
@@ -869,7 +1231,8 @@ function ask(job: Job, withErrors = false): string {
   const f = job.follows;
   const follow = f ? `This continues their previous request, "${clip(f.text, 240)}"${f.summary ? `, which ended with: ${f.summary}` : ""}. ` +
     `Build on what was done for it; where they now say otherwise, what they say now wins.\n\n` : "";
-  return `${recentChanges()}${contextBlock(withErrors)}${lastPage ? `They are looking at ${lastPage}\n\n` : ""}${job.hints ?? ""}${follow}They said: "${job.text}"`;
+  const on = slide && lastPage && samePath(slide.page, lastPage) ? `, on the slide that reads "${clip(slide.title || slide.text, 120)}"` : "";
+  return `${recentChanges()}${contextBlock(withErrors)}${lastPage ? `They are looking at ${lastPage}${on}\n\n` : ""}${job.hints ?? ""}${follow}They said: "${job.text}"`;
 }
 
 const READ_TOOLS_OFF = Object.fromEntries(
@@ -877,8 +1240,9 @@ const READ_TOOLS_OFF = Object.fromEntries(
     .map((t) => [t, false]),
 );
 const ALL_TOOLS_OFF = { ...READ_TOOLS_OFF, edit: false, write: false, patch: false };
-const ATTACH_TOOLS = { ...READ_TOOLS_OFF, read: true, grep: true };
-const FLASH_TOOLS = o.attach ? ATTACH_TOOLS : READ_TOOLS_OFF;
+const SEARCH_TOOLS = { ...READ_TOOLS_OFF, read: true, grep: true };
+const inlineAll = !o.attach && await projectFiles().catch(() => undefined) !== undefined;
+const FLASH_TOOLS = inlineAll ? READ_TOOLS_OFF : SEARCH_TOOLS;
 const EDIT_TOOLS = new Set(["edit", "write", "patch", "multiedit", "Edit", "Write", "MultiEdit"]);
 
 function insideSearch(path: string): boolean {
@@ -958,9 +1322,45 @@ function killTree(pid: number | undefined, signal: Deno.Signal = "SIGTERM") {
 }
 
 type Part = {
-  type?: string; tool?: string;
+  type?: string; tool?: string; text?: string;
   state?: { status?: string; error?: string; time?: { start?: number; end?: number }; input?: Record<string, string> };
 };
+
+type ApiError = { type: string; message: string };
+type ApiTool = {
+  type: "tool"; name: string; state: { status: string; input?: Record<string, string>; error?: ApiError };
+  time: { created: number; ran?: number; completed?: number };
+};
+type ApiMessage = {
+  id: string; type: string; error?: ApiError; outcome?: string;
+  content?: ({ type: "text" | "reasoning"; text: string } | ApiTool)[];
+};
+
+const TOOL_ACTION: Record<string, string> = { write: "edit", patch: "edit", multiedit: "edit", bash: "shell", task: "subagent" };
+const NO_V2_TOOL = new Set(["list", "todoread", "codesearch"]);
+
+function toolRules(tools: Record<string, boolean>): { action: string; resource: string; effect: string }[] {
+  const allowed = new Map<string, boolean>();
+  for (const [tool, on] of Object.entries(tools)) {
+    if (NO_V2_TOOL.has(tool)) continue;
+    const action = TOOL_ACTION[tool] ?? tool;
+    allowed.set(action, (allowed.get(action) ?? true) && on);
+  }
+  // `execute` is 2.x's code mode, a script that calls the other tools; the fast lane never had it.
+  allowed.set("execute", false);
+  return [...allowed].map(([action, on]) => ({ action, resource: "*", effect: on ? "allow" : "deny" }));
+}
+
+function toParts(m: ApiMessage): Part[] {
+  return (m.content ?? []).map((c) => {
+    if (c.type !== "tool") return { type: c.type, text: c.text };
+    const input = { ...c.state.input };
+    if (input.path && ["read", "edit", "write"].includes(c.name)) input.filePath = input.path;
+    const status = c.state.status === "streaming" ? "pending" : c.state.status;
+    const error = c.state.error && `${c.state.error.type}: ${c.state.error.message}`;
+    return { type: "tool", tool: c.name, state: { status, error, input, time: { start: c.time.ran ?? c.time.created, end: c.time.completed } } };
+  });
+}
 
 const DENIED = /PermissionDenied|EACCES|EROFS|read-only file system|Operation not permitted|permission denied/i;
 
@@ -971,7 +1371,7 @@ function sandboxDenial(parts: Part[]): string | undefined {
 
 const cannotWrite = (why: string) =>
   `the fast lane's sandbox (${o.opencodeCmd}) may not write in ${root} (${clip(why, 120)}); ` +
-  "choose a launcher whose sandbox may (on the fleet opencode-bwrap: the gVisor launchers cannot write an NFS folder)";
+  "choose a launcher whose sandbox may (with opencode-bwrap: the gVisor launchers cannot write an NFS folder)";
 
 class OpenCode {
   base = "";
@@ -979,10 +1379,19 @@ class OpenCode {
   spare?: Promise<string>;
   child?: Deno.ChildProcess;
   ready = Promise.withResolvers<void>();
+  auth: Record<string, string> = {};
+
+  // opencode 2.x serve requires basic auth (user opencode): a server it starts prints the password it
+  // made up; one given with --opencode takes OPENCODE_PASSWORD, as opencode's own --server does.
+  login(password: string | undefined) {
+    this.auth = password ? { authorization: `Basic ${btoa(`opencode:${password}`)}` } : {};
+  }
 
   async start() {
-    if (o.opencode) this.base = o.opencode;
-    else {
+    if (o.opencode) {
+      this.base = o.opencode;
+      this.login(Deno.env.get("OPENCODE_PASSWORD"));
+    } else {
       const port = o.port + 1;
       this.base = `http://127.0.0.1:${port}`;
       const logFile = await Deno.open(`${tmp}/agent-interactive-${o.port}-opencode.log`, {
@@ -991,8 +1400,19 @@ class OpenCode {
       try {
         this.child = new Deno.Command(o.opencodeCmd, {
           args: ["serve", "--port", String(port), "--hostname", "127.0.0.1"],
-          cwd: root, stdin: "null", stdout: "null", stderr: "piped",
+          cwd: root, stdin: "null", stdout: "piped", stderr: "piped",
         }).spawn();
+        let seen = "";
+        this.child.stdout.pipeThrough(new TextDecoderStream()).pipeTo(new WritableStream({
+          write: (chunk) => {
+            seen = (seen + chunk).slice(-4096);
+            const m = seen.match(/^server password (\S+)$/m);
+            if (m) {
+              this.login(m[1]);
+              seen = "";
+            }
+          },
+        })).catch(() => {});
       } catch (e) {
         if (e instanceof Deno.errors.NotFound) {
           throw new Error(`'${o.opencodeCmd}' is not on PATH; pass --opencode-cmd <opencode launcher> or --opencode <running server URL>`);
@@ -1005,7 +1425,7 @@ class OpenCode {
       const until = now() + 30_000;
       for (;;) {
         try {
-          if ((await fetch(`${this.base}/config`, { signal: AbortSignal.timeout(1000) })).ok) break;
+          if ((await fetch(`${this.base}/api/info`, { headers: this.auth, signal: AbortSignal.timeout(1000) })).ok) break;
         } catch { /* not up yet */ }
         const log = `${tmp}/agent-interactive-${o.port}-opencode.log`;
         if (exited !== undefined) throw new Error(`${o.opencodeCmd} serve exited ${exited} before answering; see ${log}`);
@@ -1018,12 +1438,27 @@ class OpenCode {
     this.ready.resolve();
   }
 
-  async newSession(): Promise<string> {
-    const r = await fetch(`${this.base}/session`, {
-      method: "POST", headers: JSON_H, body: JSON.stringify({ title: "agent-interactive" }),
+  async api(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
+    const r = await fetch(`${this.base}/api${path}`, {
+      method, signal, headers: body === undefined ? this.auth : { ...this.auth, ...JSON_H },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    if (!r.ok) throw new Error(`opencode session: ${r.status} ${await r.text()}`);
-    const sid = (await r.json()).id;
+    if (!r.ok) throw new Error(`opencode ${method} ${path.replace(/ses_\w+/, ":id")}: ${r.status} ${clip(await r.text(), 200)}`);
+    return r;
+  }
+
+  interrupt(sid: string): Promise<unknown> {
+    return fetch(`${this.base}/api/session/${sid}/interrupt`, { method: "POST", headers: this.auth }).catch(() => {});
+  }
+
+  async session(title: string, signal?: AbortSignal): Promise<string> {
+    const [providerID, ...rest] = o.flashModel.split("/");
+    const model = rest.length ? { providerID, id: rest.join("/") } : undefined;
+    return (await (await this.api("POST", "/session", { title, model }, signal)).json()).data.id;
+  }
+
+  async newSession(): Promise<string> {
+    const sid = await this.session("agent-interactive");
     await this.message(sid, "Reply with the single word ok. Use no tools and ask nothing.", ALL_TOOLS_OFF);
     return sid;
   }
@@ -1035,22 +1470,21 @@ class OpenCode {
     return sid;
   }
 
-  async message(sid: string, text: string, tools: Record<string, boolean>): Promise<{ text: string; ctx: number }> {
-    const [providerID, ...rest] = o.flashModel.split("/");
-    const model = rest.length ? { providerID, modelID: rest.join("/") } : undefined;
-    const r = await fetch(`${this.base}/session/${sid}/message`, {
-      method: "POST", headers: JSON_H, signal: AbortSignal.timeout(120_000),
-      body: JSON.stringify({ parts: [{ type: "text", text }], tools, model }),
-    });
-    if (!r.ok) throw new Error(`opencode ${r.status}: ${clip(await r.text(), 200)}`);
-    const m = await r.json();
-    if (m.info?.error) throw new Error(`opencode: ${clip(JSON.stringify(m.info.error), 200)}`);
-    const t = m.info?.tokens ?? {};
-    return {
-      text: (m.parts ?? []).filter((p: { type: string }) => p.type === "text")
-        .map((p: { text: string }) => p.text).join("").trim(),
-      ctx: (t.input ?? 0) + (t.cache?.read ?? 0) + (t.output ?? 0),
-    };
+  async message(sid: string, text: string, tools: Record<string, boolean>, signal = AbortSignal.timeout(120_000)): Promise<string> {
+    await this.api("PATCH", `/session/${sid}`, { permissions: toolRules(tools) }, signal);
+    const asked = (await (await this.api("POST", `/session/${sid}/prompt`, { text }, signal)).json()).data.id;
+    await this.api("POST", `/experimental/session/${sid}/wait`, undefined, signal);
+    const turns = await this.turns(sid, signal);
+    const after = turns.slice(turns.findIndex((m) => m.id === asked) + 1);
+    const reply = after.filter((m) => m.type === "assistant").at(-1);
+    const failed = reply?.error ?? after.findLast((m) => m.type === "idle")?.error;
+    if (failed) throw new Error(`opencode: ${failed.type}: ${clip(failed.message, 200)}`);
+    return toParts(reply ?? { id: "", type: "assistant" }).filter((p) => p.type === "text").map((p) => p.text).join("").trim();
+  }
+
+  async turns(sid: string, signal?: AbortSignal): Promise<ApiMessage[]> {
+    const newest: ApiMessage[] = (await (await this.api("GET", `/session/${sid}/message?order=desc&limit=200`, undefined, signal)).json()).data;
+    return newest.reverse();
   }
 
   async run(job: Job, w?: Worker): Promise<string> {
@@ -1064,7 +1498,7 @@ class OpenCode {
     job.promptBytes = prompt.length;
     job.prompt = prompt;
     let aborting: Promise<unknown> = Promise.resolve();
-    const abort = () => (aborting = fetch(`${this.base}/session/${sid}/abort`, { method: "POST" }).catch(() => {}));
+    const abort = () => (aborting = this.interrupt(sid));
     const tools = job.dry ? { ...FLASH_TOOLS, edit: false, write: false, patch: false } : FLASH_TOOLS;
     let over = false;
     const budget = setTimeout(() => {
@@ -1082,8 +1516,9 @@ class OpenCode {
           abort();
         }
       }).catch(() => {}), 500);
+    const overBudget = () => new OverBudget(`nothing changed within ${o.flashBudget}s`);
     try {
-      const { text } = await this.message(sid, prompt, tools);
+      const text = await this.message(sid, prompt, tools);
       await this.editTimes(job, sid).catch(() => {});
       if (job.writeDenied && job.write === undefined) throw new Error(cannotWrite(job.writeDenied));
       return text;
@@ -1094,16 +1529,15 @@ class OpenCode {
         await aborting;
         await delay(300);
         try {
-          const { text } = await this.message(sid, `That search ran outside ${searchDirs.join(", ")} and was stopped: it is far too slow. ` +
+          const text = await this.message(sid, `That search ran outside ${searchDirs.join(", ")} and was stopped: it is far too slow. ` +
             `Search only inside those directories, or use the files already given, then make the change.`, tools);
           await this.editTimes(job, sid).catch(() => {});
           return text;
         } catch (e2) {
-          if (over) throw new OverBudget(`nothing changed within ${o.flashBudget}s`);
-          throw e2;
+          throw over ? overBudget() : e2;
         }
       }
-      if (over) throw new OverBudget(`nothing changed within ${o.flashBudget}s`);
+      if (over) throw overBudget();
       if (/ContextOverflow|exceeds model limit|too large/i.test(errText(e)) && !job.retried) {
         job.retried = true;
         say(`#${job.id} fast lane: the prompt overflowed its session; retrying once in a new one`);
@@ -1119,24 +1553,16 @@ class OpenCode {
   async judge(text: string, ms: number): Promise<string> {
     await this.ready.promise;
     const signal = AbortSignal.timeout(ms);
-    const r = await fetch(`${this.base}/session`, { method: "POST", headers: JSON_H, body: JSON.stringify({ title: "agent-interactive judge" }), signal });
-    if (!r.ok) throw new Error(`opencode session: ${r.status}`);
-    const sid = (await r.json()).id;
+    const sid = await this.session("agent-interactive judge", signal);
     try {
-      const [providerID, ...rest] = o.flashModel.split("/");
-      const m = await (await fetch(`${this.base}/session/${sid}/message`, {
-        method: "POST", headers: JSON_H, signal,
-        body: JSON.stringify({ parts: [{ type: "text", text }], tools: ALL_TOOLS_OFF, model: rest.length ? { providerID, modelID: rest.join("/") } : undefined }),
-      })).json();
-      if (m.info?.error) throw new Error(`opencode: ${clip(JSON.stringify(m.info.error), 120)}`);
-      return (m.parts ?? []).filter((p: { type: string }) => p.type === "text").map((p: { text: string }) => p.text).join("").trim();
+      return await this.message(sid, text, ALL_TOOLS_OFF, signal);
     } finally {
-      fetch(`${this.base}/session/${sid}`, { method: "DELETE" }).catch(() => {});
+      fetch(`${this.base}/api/session/${sid}`, { method: "DELETE", headers: this.auth }).catch(() => {});
     }
   }
 
   async messages(sid: string, signal?: AbortSignal): Promise<{ parts?: Part[] }[]> {
-    return await (await fetch(`${this.base}/session/${sid}/message`, { signal })).json();
+    return (await this.turns(sid, signal)).filter((m) => m.type === "assistant").map((m) => ({ parts: toParts(m) }));
   }
 
   async activity(sid: string): Promise<{ text: string; stray: boolean }> {
@@ -1233,6 +1659,9 @@ class TermClaude {
     let child: Deno.ChildProcess;
     try {
       const env = Object.fromEntries(Object.entries(Deno.env.toObject()).filter(([k]) => !/^(CLAUDECODE$|CLAUDE_CODE_|CLAUDE_PID$|CLAUDE_EFFORT$)/.test(k)));
+      const anthropicKey = keyFrom(o.anthropicKeyFile);
+      if (anthropicKey) env.ANTHROPIC_API_KEY = anthropicKey;
+      if (o.anthropicWorkspaceId) env.ANTHROPIC_CUSTOM_HEADERS = `anthropic-workspace-id: ${o.anthropicWorkspaceId}`;
       child = new Deno.Command(PTY_CMD, { args, cwd: root, env, clearEnv: true, stdin: "piped", stdout: "piped", stderr: "piped" }).spawn();
     } catch (e) {
       if (e instanceof Deno.errors.NotFound) {
@@ -1255,8 +1684,14 @@ class TermClaude {
       this.child = undefined;
       this.input = undefined;
       const why = (await errors.catch(() => "")).trim();
+      if (why) markSmart("claude", why);
       say(`${this.name}: claude ended (exit ${st.code})${why ? `: ${clip(why, 160)}` : ""}; ` +
         `the next change starts it again${this.sid ? `, resuming session ${this.sid}` : ""}`);
+      if (!this.isReady) {
+        // it died before its first prompt: the request must fail now (and try Codex), not wait on a terminal nobody will answer
+        const shown = this.tail.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").split("\n").map((l) => l.trim()).filter(Boolean).slice(-3).join(" ");
+        this.ready.reject(new Error(`${this.name}'s Claude exited ${st.code} before it was ready${shown || why ? `: ${clip(shown || why, 300)}` : ""}`));
+      }
       for (const v of this.viewers) v.readyState === WebSocket.OPEN && v.send(JSON.stringify({ exit: st.code }));
       const w = this.waiting;
       this.waiting = undefined;
@@ -1393,6 +1828,7 @@ class TermClaude {
     const w = this.worker ?? workers.find((x) => x.name === this.name);
     const i = ev.tool_input ?? {};
     const event = ev.hook_event_name;
+    const who = `${this.job ? `#${this.job.id} ` : ""}${this.name}`;
     if (event !== "Notification") this.attention = "";
     if (event === "UserPromptSubmit" && !this.job) {
       this.typing = true;
@@ -1402,7 +1838,7 @@ class TermClaude {
     if (event === "Notification") {
       if (!this.job && !this.typing) return;
       this.attention = ev.message ?? "it needs you";
-      say(`${this.job ? `#${this.job.id} ` : ""}${this.name} waits for you in its terminal: ${this.attention}`);
+      say(`${who} waits for you in its terminal: ${this.attention}`);
       if (this.job) status(this.job, "working", `${this.name} needs you: ${clip(this.attention, 50)}`);
       note(w, `! ${this.attention}`);
       speakText(`${this.name.replace("-", " ")} needs you in its terminal.`);
@@ -1411,7 +1847,7 @@ class TermClaude {
     if (event === "PreToolUse" && ev.tool_name === "AskUserQuestion") {
       const q = i.questions?.[0]?.question ?? "a question";
       this.attention = q;
-      say(`${this.job ? `#${this.job.id} ` : ""}${this.name} is asking in its terminal: ${q}`);
+      say(`${who} is asking in its terminal: ${q}`);
       if (this.job) status(this.job, "working", `Claude asks: ${clip(q, 60)}`);
       speakText(`Claude is asking: ${clip(q, 140)}`);
       return;
@@ -1438,10 +1874,6 @@ class TermClaude {
     }
   }
 
-  busy(): boolean {
-    return this.typing;
-  }
-
   async run(job: Job, worker?: Worker): Promise<string> {
     this.job = job;
     this.worker = worker;
@@ -1463,8 +1895,11 @@ class TermClaude {
       status(job, "working", `${this.name} needs you in its terminal…`);
       speakText(`${this.name.replace("-", " ")} needs you in its terminal.`);
     }, 5000);
-    await this.ready.promise;
-    clearTimeout(late);
+    try {
+      await this.ready.promise;
+    } finally {
+      clearTimeout(late);
+    }
     this.attention = "";
     if (worker) worker.activity = "reading the request";
     note(worker, "typed into its terminal");
@@ -1504,6 +1939,105 @@ class TermClaude {
     this.input?.close().catch(() => {});
     killTree(this.child?.pid);
   }
+
+  /** After a model change: an idle terminal is closed so the next turn starts a fresh one. */
+  renew() {
+    if (this.job || !this.child) return;
+    this.stop();
+    this.child = undefined;
+    this.input = undefined;
+    this.live = false;
+    this.sid = "";
+    this.isReady = false;
+    this.ready = Promise.withResolvers<void>();
+  }
+}
+
+// ------------------------------------------------------------------ the Codex agent
+
+/** A Codex CLI run per request: `codex exec --json`, its items read as the request's tool trace. */
+class CodexExec {
+  job?: Job;
+  worker?: Worker;
+  child?: Deno.ChildProcess;
+  constructor(readonly name: string) {}
+
+  async run(job: Job, worker?: Worker): Promise<string> {
+    this.job = job;
+    this.worker = worker;
+    if (worker) worker.activity = "starting codex";
+    const prompt = `${OPUS_ROLE}\n\n${ask(job, true)}`;
+    const args = ["exec", "--json", "--skip-git-repo-check", "-s", "workspace-write", "-C", root, ...(o.codexModel ? ["-m", o.codexModel] : []), prompt];
+    const env = Deno.env.toObject();
+    const key = openaiKey();
+    if (key) env.OPENAI_API_KEY = key;
+    let child: Deno.ChildProcess;
+    try {
+      child = new Deno.Command(o.codexCmd, { args, cwd: root, env, stdin: "null", stdout: "piped", stderr: "piped" }).spawn();
+    } catch (e) {
+      if (e instanceof Deno.errors.NotFound) throw new Error(`'${o.codexCmd}' is not on PATH (--codex-cmd); --smart claude or none keeps Codex out`);
+      throw e;
+    }
+    this.child = child;
+    const timer = setTimeout(() => killTree(child.pid), 900_000);
+    let reply = "", stderr = "";
+    const errDone = (async () => {
+      for await (const chunk of child.stderr.pipeThrough(new TextDecoderStream())) stderr = (stderr + chunk).slice(-2000);
+    })();
+    try {
+      let buf = "";
+      for await (const chunk of child.stdout.pipeThrough(new TextDecoderStream())) {
+        buf += chunk;
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line.startsWith("{")) continue;
+          let ev: { type?: string; item?: { type?: string; text?: string; command?: string; status?: string; changes?: { path: string; kind: string }[]; message?: string } };
+          try {
+            ev = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          const it = ev.item;
+          if (!it) continue;
+          if (it.type === "agent_message" && ev.type === "item.completed" && it.text) {
+            reply = it.text.trim();
+            note(worker, clip(reply, 300));
+          } else if (it.type === "command_execution" && ev.type === "item.started") {
+            (job.trace ??= []).push({ tool: "Run", what: clip(it.command ?? "", 120) });
+            if (worker) worker.activity = `run ${clip(it.command ?? "", 60)}`;
+            note(worker, `→ Run ${clip(it.command ?? "", 200)}`);
+          } else if (it.type === "file_change" && ev.type === "item.completed") {
+            for (const c of it.changes ?? []) {
+              const rel = relTo(c.path);
+              (job.trace ??= []).push({ tool: c.kind === "add" ? "Write" : c.kind === "delete" ? "Delete" : "Edit", what: rel, status: it.status });
+              note(worker, `→ ${c.kind} ${rel}${it.status === "failed" ? " (failed)" : ""}`);
+              if (it.status !== "failed") {
+                noteWrite(job, now(), c.path);
+                noteEdit(job, c.path);
+              }
+            }
+          } else if (it.type === "error" && it.message) {
+            note(worker, `codex: ${clip(it.message, 200)}`);
+          }
+        }
+      }
+      const st = await child.status;
+      await errDone;
+      if (!st.success && !reply) throw new Error(`codex exited ${st.code}: ${clip(stderr.replace(/\s+/g, " ").trim(), 300)}`);
+      return reply;
+    } finally {
+      clearTimeout(timer);
+      this.child = undefined;
+      this.job = undefined;
+      this.worker = undefined;
+    }
+  }
+
+  interrupt() {
+    killTree(this.child?.pid);
+  }
 }
 
 type Worker = {
@@ -1520,18 +2054,188 @@ function note(w: Worker | undefined, text: string) {
 }
 
 const opencode = new OpenCode();
-const claude = o.claudeCmd !== "none";
+const claudeAvailable = o.claudeCmd !== "none";
+const codexAvailable = o.codexCmd !== "none";
+let smart: "claude" | "codex" | "none" = (o.smart || (claudeAvailable ? "claude" : "none")) as "claude" | "codex" | "none";
+if (smart === "claude" && !claudeAvailable) smart = "none";
+if (smart === "codex" && !codexAvailable) smart = "none";
+const smartOn = () => smart !== "none";
+const claude = claudeAvailable || codexAvailable;
 const PTY_CMD = Deno.env.get("AGENT_PTY") || "agent-pty";
-const claudeBackends: TermClaude[] = claude ? Array.from({ length: o.claudeWorkers }, (_, i) => new TermClaude(`claude-${i + 1}`)) : [];
+const claudeBackends: TermClaude[] = claudeAvailable ? Array.from({ length: o.claudeWorkers }, (_, i) => new TermClaude(`claude-${i + 1}`)) : [];
+const codexBackends: CodexExec[] = codexAvailable ? Array.from({ length: Math.max(1, Math.min(2, o.claudeWorkers)) }, (_, i) => new CodexExec(`codex-${i + 1}`)) : [];
+
+// The smart lane's health: an agent error that means the lane cannot work at all (a rejected or
+// unscoped key, an API it cannot reach) marks its backend down, with the reason as one plain
+// sentence, so the fast lane stops handing requests into a lane that cannot take them and the
+// person hears what is wrong instead of a clipped stderr. A down backend is probed again every
+// ten minutes and comes back on its own. Startup probes each configured backend's API once.
+type SmartHealth = { ok: boolean; why?: string; at: number };
+type SmartBackend = "claude" | "codex";
+const smartHealth: Record<SmartBackend, SmartHealth> = { claude: { ok: true, at: 0 }, codex: { ok: true, at: 0 } };
+const smartLabel: Record<SmartBackend, string> = { claude: "Claude", codex: "Codex" };
+const SMART_RECHECK_MS = 10 * 60_000;
+const smartRechecks: Partial<Record<SmartBackend, ReturnType<typeof setTimeout>>> = {};
+
+function smartOutage(which: SmartBackend, raw: string): string | undefined {
+  const who = smartLabel[which];
+  if (/not scoped to a workspace|anthropic-workspace-id/i.test(raw)) {
+    return `${who}'s Anthropic key is not scoped to a workspace (pass --anthropic-workspace-id or use a workspace key)`;
+  }
+  if (/model_not_found|does not exist or you do not have access/i.test(raw)) return `${who}'s key has no access to the model it asks for`;
+  if (/\b401\b|unauthorized|authentication_error|invalid[_ ]api[_ ]key|incorrect api key|invalid x-api-key/i.test(raw)) return `${who}'s key was rejected`;
+  if (/\b403\b|forbidden|permission_error/i.test(raw)) return `${who}'s key is not allowed to do this`;
+  if (/unable to connect|failed to connect|econnrefused|enotfound|eai_again|etimedout|econnreset|network error|fetch failed|tcp_denied|tunnel connection failed/i.test(raw)) {
+    return `${who} cannot reach its API from this host`;
+  }
+  return undefined;
+}
+
+function markSmart(which: SmartBackend, raw: string): boolean {
+  const why = smartOutage(which, raw);
+  if (!why) return false;
+  const h = smartHealth[which];
+  if (h.ok || h.why !== why) say(`${smartLabel[which]} is unavailable: ${why}`);
+  h.ok = false;
+  h.why = why;
+  h.at = now();
+  scheduleSmartRecheck(which);
+  return true;
+}
+
+function scheduleSmartRecheck(which: SmartBackend) {
+  if (smartRechecks[which]) return;
+  smartRechecks[which] = setTimeout(() => {
+    smartRechecks[which] = undefined;
+    probeSmart(which);
+  }, SMART_RECHECK_MS);
+}
+
+function smartUsers(): SmartBackend[] {
+  if (smart === "codex") return ["codex"];
+  if (smart === "claude") return codexAvailable && autoRetry ? ["claude", "codex"] : ["claude"];
+  return [];
+}
+
+/** One plain sentence when no backend the smart lane would use can work; undefined while one can. */
+function smartDown(): string | undefined {
+  const using = smartUsers();
+  if (!using.length || using.some((w) => smartHealth[w].ok)) return undefined;
+  const reasons = [...new Set(using.map((w) => smartHealth[w].why).filter(Boolean))].join("; ");
+  return `The smart agents can't sign in right now (${reasons}); only small edits work until that is fixed.`;
+}
+
+async function probeSmart(which: SmartBackend): Promise<SmartHealth> {
+  const h = smartHealth[which];
+  let res: Response;
+  try {
+    if (which === "claude") {
+      const key = keyFrom(o.anthropicKeyFile);
+      if (!key) return h;
+      const headers: Record<string, string> = { "x-api-key": key, "anthropic-version": "2023-06-01" };
+      if (o.anthropicWorkspaceId) headers["anthropic-workspace-id"] = o.anthropicWorkspaceId;
+      res = await fetch("https://api.anthropic.com/v1/models?limit=1", { headers, signal: AbortSignal.timeout(8000) });
+    } else {
+      const key = openaiKey();
+      if (!key) return h;
+      res = await fetch("https://api.openai.com/v1/models", { headers: { authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(8000) });
+    }
+  } catch (e) {
+    if (!markSmart(which, errText(e))) {
+      Object.assign(h, { ok: false, why: `${smartLabel[which]} cannot reach its API from this host (${clip(errText(e), 80)})`, at: now() });
+      scheduleSmartRecheck(which);
+    }
+    return h;
+  }
+  if (res.ok) {
+    await res.body?.cancel();
+    if (!h.ok) say(`${smartLabel[which]} is back: its API answers again`);
+    Object.assign(h, { ok: true, why: undefined, at: now() });
+    return h;
+  }
+  const body = await res.text().catch(() => "");
+  if (!markSmart(which, `${res.status} ${body}`)) {
+    Object.assign(h, { ok: false, why: `${smartLabel[which]}'s API answered ${res.status}`, at: now() });
+    scheduleSmartRecheck(which);
+  }
+  return h;
+}
+
+for (const which of ["claude", "codex"] as const) {
+  const configured = which === "claude" ? claudeAvailable && Boolean(o.anthropicKeyFile) : codexAvailable && Boolean(o.openaiKeyFile || o.speechKeyFile);
+  if (configured) probeSmart(which).then((h) => { if (h.ok) say(`${smartLabel[which]}: its API is reachable and the key is accepted`); });
+}
 const terms = new Map(claudeBackends.map((b) => [b.name, b]));
+
+// ------------------------------------------------------------------ what the widget may change
+
+type Settings = { flashModel: string; smart: string; claudeModel: string; claudeEffort: string; codexModel: string; sttModel: string; ttsModel: string; ttsVoice: string; autoRetry: boolean };
+let autoRetry = true;
+function settingsNow(): Settings {
+  return { flashModel: o.flashModel, smart, claudeModel: o.claudeModel, claudeEffort: o.claudeEffort, codexModel: o.codexModel, sttModel: o.sttModel, ttsModel: o.ttsModel, ttsVoice: o.ttsVoice, autoRetry };
+}
+function settingsChoices() {
+  return {
+    flash: [...new Set([o.flashModel, "cerebras/qwen-3.8-27b", "openrouter/anthropic/claude-sonnet-5-5", "openrouter/openai/gpt-5.1-codex", "openrouter/qwen/qwen3-coder"])],
+    smart: ["none", ...(claudeAvailable ? ["claude"] : []), ...(codexAvailable ? ["codex"] : [])],
+    claude: [...new Set([o.claudeModel, "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-4-5-20251001"])],
+    claudeEffort: ["", "low", "medium", "high", "xhigh", "max"],
+    codex: [...new Set([o.codexModel, "", "gpt-5.1-codex", "gpt-5.1-codex-mini", "gpt-5-codex", "o4-mini"])],
+    stt: [...new Set([o.sttModel, "", "gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"])],
+    tts: [...new Set([o.ttsModel, "kokoro", "gpt-4o-mini-tts", "tts-1"])],
+    voices: [...new Set([o.ttsVoice, "marin", "cedar", "nova", "alloy", "ash", "coral", "sage", "shimmer", "af_heart"])],
+  };
+}
+function applySettings(n: Partial<Settings>): string | null {
+  const next = { ...settingsNow(), ...Object.fromEntries(Object.entries(n).filter(([, v]) => typeof v === "string")) } as Settings;
+  if (typeof n.autoRetry === "boolean") next.autoRetry = n.autoRetry;
+  if (!/^[^/\s]+\/\S+$/.test(next.flashModel)) return `the fast lane model is provider/model (got ${next.flashModel})`;
+  if (!/^(claude|codex|none)$/.test(next.smart)) return "the smart agent is claude, codex or none";
+  if (next.smart === "claude" && !claudeAvailable) return "Claude is not on this loop (--claude-cmd none)";
+  if (next.smart === "codex" && !codexAvailable) return "Codex is not on this loop (--codex-cmd none)";
+  if (next.claudeEffort && !/^(low|medium|high|xhigh|max)$/.test(next.claudeEffort)) return "effort is low, medium, high, xhigh or max";
+  for (const k of ["claudeModel", "codexModel", "sttModel", "ttsModel", "ttsVoice"] as const) {
+    if (!/^[\w.:/-]*$/.test(next[k])) return `${k}: letters, digits, dots, dashes and slashes only`;
+  }
+  if (!next.claudeModel || !next.ttsModel || !next.ttsVoice) return "the Claude model, speech model and voice cannot be empty";
+  const claudeChanged = next.claudeModel !== o.claudeModel || next.claudeEffort !== o.claudeEffort;
+  o.flashModel = next.flashModel;
+  smart = next.smart as typeof smart;
+  o.claudeModel = next.claudeModel;
+  o.claudeEffort = next.claudeEffort;
+  o.codexModel = next.codexModel;
+  o.sttModel = next.sttModel;
+  o.ttsModel = next.ttsModel;
+  o.ttsVoice = next.ttsVoice;
+  autoRetry = next.autoRetry;
+  if (claudeChanged) for (const b of claudeBackends) b.renew();
+  if (o.settingsFile) {
+    try {
+      Deno.writeTextFileSync(o.settingsFile, JSON.stringify(settingsNow(), null, 1) + "\n", { mode: 0o600 });
+    } catch (e) {
+      say(`settings: could not save to ${o.settingsFile}: ${errText(e)}`);
+    }
+  }
+  say(`settings: fast ${o.flashModel}; smart ${smart}${smart === "claude" ? ` (${o.claudeModel}${o.claudeEffort ? `, ${o.claudeEffort}` : ""})` : smart === "codex" ? ` (${o.codexModel || "codex's default"})` : ""}; ` +
+    `speech ${o.ttsModel}/${o.ttsVoice}${o.sttModel ? `, hearing ${o.sttModel}` : ""}`);
+  pump();
+  return null;
+}
 const workers: Worker[] = [
   {
     name: "flash", lane: "flash", activity: "", log: [],
     interrupt: (job) => {
-      if (job.sid) fetch(`${opencode.base}/session/${job.sid}/abort`, { method: "POST" }).catch(() => {});
+      if (job.sid) opencode.interrupt(job.sid);
     },
     run: async (job, w) => {
       const handOff = (why: string, pill: string) => {
+        const down = smartDown();
+        if (down) {
+          say(`#${job.id} ${why}; ${down}`);
+          job.error = down;
+          job.smartDown = true;
+          return;
+        }
         say(`#${job.id} ${why}`);
         status(job, "working", `${pill}: handing to Claude…`);
         job.route = "flash→opus";
@@ -1542,18 +2246,30 @@ const workers: Worker[] = [
         reply = await opencode.run(job, w);
       } catch (e) {
         if (job.cancelled) return;
-        if (!claude || job.dry) throw e;
-        if (e instanceof OverBudget) return handOff(`fast lane: ${e.message}; handing it to Claude`, "taking longer");
+        if (!smartOn() || job.dry) throw e;
+        if (e instanceof OverBudget) return handOff(`fast lane: ${e.message}; handing it to ${smart}`, "taking longer");
         return handOff(`fast lane failed (${clip(errText(e), 100)}); handing it to Claude`, "fast lane failed");
       }
-      if (/^\s*ESCALATE/i.test(reply) && claude && job.write === undefined && !job.dry) {
+      if (/^\s*ESCALATE/i.test(reply) && smartOn() && job.write === undefined && !job.dry) {
         return handOff(`escalating: ${clip(reply.replace(/^\s*ESCALATE:?\s*/i, ""), 100)}`, "bigger change");
+      }
+      // a typed request is a change request by definition: a SKIP from the fast model means it did not
+      // understand, not that nothing was asked, so a smarter agent takes it (once, when that is on)
+      if (/^\s*SKIP\b/i.test(reply) && smartOn() && autoRetry && job.write === undefined && !job.dry && job.source !== "narration" && job.source !== "repair") {
+        return handOff("fast lane answered SKIP to a typed request; handing it to " + smart, "not understood");
       }
       job.reply = reply;
     },
   },
   ...claudeBackends.map((b): Worker => ({
-    name: b.name, lane: "claude", activity: "", log: [], busy: () => b.busy(),
+    name: b.name, lane: "claude", activity: "", log: [], busy: () => b.typing || smart !== "claude",
+    interrupt: () => b.interrupt(),
+    run: async (job, w) => {
+      job.reply = await b.run(job, w);
+    },
+  })),
+  ...codexBackends.map((b): Worker => ({
+    name: b.name, lane: "claude", activity: "", log: [], busy: () => smart !== "codex" && !queues.claude.some((j) => j.pin === b.name),
     interrupt: () => b.interrupt(),
     run: async (job, w) => {
       job.reply = await b.run(job, w);
@@ -1562,6 +2278,13 @@ const workers: Worker[] = [
 ];
 const queues = { flash: [] as Job[], claude: [] as Job[] };
 const preparing = new Set<Job>();
+if (o.settingsFile) {
+  try {
+    const saved = JSON.parse(Deno.readTextFileSync(o.settingsFile));
+    const err = applySettings(saved);
+    if (err) say(`settings file ${o.settingsFile} ignored: ${err}`);
+  } catch { /* none saved yet */ }
+}
 
 function overlaps(a: Job, b: Job): string | undefined {
   if (!a.footprint || !b.footprint) return a.page && b.page && !samePath(a.page, b.page) ? undefined : "files unknown";
@@ -1571,18 +2294,11 @@ function overlaps(a: Job, b: Job): string | undefined {
 
 function blocker(job: Job, lane: "flash" | "claude"): { by: Job; why: string } | undefined {
   if (job.follows && job.follows.done === undefined) return { by: job.follows, why: "follows" };
-  const holds = (why: string | undefined, sameLane: boolean) => why && (why !== "files unknown" || (sameLane && lane === "flash"));
-  for (const w of workers) {
-    if (!w.job) continue;
-    if (w.lane !== lane) continue;
-    const why = overlaps(job, w.job);
-    if (holds(why, true)) return { by: w.job, why: why! };
-  }
-  for (const other of queues[lane]) {
-    if (other === job) break;
-    if (other.follows && other.follows.done === undefined) continue;
-    const why = overlaps(job, other);
-    if (holds(why, true)) return { by: other, why: why! };
+  const q = queues[lane];
+  const ahead = q.indexOf(job) < 0 ? q : q.slice(0, q.indexOf(job));
+  for (const by of [...workers.flatMap((w) => w.job && w.lane === lane ? [w.job] : []), ...ahead.filter((x) => x.follows?.done !== undefined || !x.follows)]) {
+    const why = overlaps(job, by);
+    if (why && (why !== "files unknown" || lane === "flash")) return { by, why };
   }
   return undefined;
 }
@@ -1606,7 +2322,7 @@ function submit(job: Job) {
     finish(job);
     return;
   }
-  if (job.route !== "flash" && !claude) job.route = "flash";
+  if (job.route !== "flash" && !smartOn()) job.route = "flash";
   const lane = job.route === "flash" ? "flash" : "claude";
   queues[lane].push(job);
   pump();
@@ -1643,14 +2359,44 @@ async function work(w: Worker, job: Job) {
     note(w, `${x.name} (#${x.job.id}) is also editing ${f}`);
   }
   job.worker = w.name;
+  job.lane = w.lane === "flash" ? "fast" : w.name.startsWith("codex") ? "codex" : "claude";
   job.dispatched ??= now();
   inflight.add(job);
+  const logFrom = logSeq;
   try {
     await w.run(job, w);
   } catch (e) {
     job.error = errText(e);
   }
   inflight.delete(job);
+  // the agent's own lines are the log of this request, kept whatever the outcome
+  job.log = [...(job.log ?? []), ...w.log.filter((l) => l.seq > logFrom).map((l) => ({ t: l.t, text: l.text }))];
+  const backend: SmartBackend | undefined = w.lane === "claude" ? (w.name.startsWith("codex") ? "codex" : "claude") : undefined;
+  if (job.error && !job.cancelled && backend && markSmart(backend, job.error)) {
+    job.log.push({ t: now(), text: `${smartLabel[backend]}: ${clip(job.error, 300)}` });
+  }
+  if (job.error && !job.cancelled && !job.dry && backend === "claude" && codexAvailable && smartHealth.codex.ok && autoRetry && !job.triedCodex) {
+    job.triedCodex = true;
+    const err = job.error;
+    job.error = undefined;
+    job.pin = codexBackends[0]?.name;
+    say(`#${job.id} Claude failed (${clip(err, 100)}); trying Codex`);
+    status(job, "working", "Claude failed: trying Codex…");
+    job.log.push({ t: now(), text: `Claude failed: ${clip(err, 200)}; trying Codex` });
+    w.job = undefined;
+    w.since = now();
+    w.activity = "";
+    queues.claude.push(job);
+    pump();
+    return;
+  }
+  if (job.error && !job.cancelled && backend) {
+    const down = smartDown();
+    if (down) {
+      job.error = down;
+      job.smartDown = true;
+    }
+  }
   const took = Math.round((now() - (w.since ?? now())) / 1000);
   note(w, job.error ? `■ #${job.id} failed after ${took}s: ${clip(job.error, 200)}`
     : job.escalated ? `■ #${job.id} handed to Claude after ${took}s`
@@ -1676,16 +2422,18 @@ async function work(w: Worker, job: Job) {
   pump();
 }
 
+function toClaude(j: Job): boolean {
+  j.route = "opus";
+  const i = queues.flash.indexOf(j);
+  if (i >= 0) queues.claude.push(...queues.flash.splice(i, 1));
+  return i >= 0;
+}
+
 function bindFollow(f: Job) {
   const p = f.follows!;
   const onClaude = claude && (p.route !== "flash" || Boolean(p.worker?.startsWith("claude")));
   if (onClaude) {
-    const i = queues.flash.indexOf(f);
-    if (i >= 0) {
-      queues.flash.splice(i, 1);
-      queues.claude.push(f);
-    }
-    f.route = "opus";
+    toClaude(f);
     if (p.worker?.startsWith("claude")) f.pin = p.worker;
   }
   if (p.done === undefined) return;
@@ -1720,7 +2468,11 @@ async function finish(job: Job) {
   } else if (job.dry) {
     job.summary = clip(reply.replace(/\s+/g, " "), 300);
   } else if (job.error) {
-    status(job, "error", `✗ ${clip(job.error, 80)}`);
+    status(job, "error", job.smartDown ? job.error : `✗ ${clip(job.error, 80)}`);
+    if (job.smartDown) {
+      job.summary = job.error;
+      spoken = speak(job);
+    }
   } else if (/^\s*SKIP\b/i.test(reply) && job.write === undefined) {
     status(job, "skip", "not a change request");
   } else if (job.hmrError && job.repairOf === undefined) {
@@ -1743,13 +2495,21 @@ async function finish(job: Job) {
   if (spoken) await Promise.race([spoken, delay(8000)]);
   const r = record(job);
   say(summaryLine(job));
-  Deno.writeTextFile(logPath, JSON.stringify(r) + "\n", { append: true }).catch(() => {});
-  trace({
+  if (!job.deleted) {
+    const offset = await Deno.stat(logPath).then((s) => s.size).catch(() => 0);
+    job.logRecord = `conversation:${logPath.slice(logPath.lastIndexOf("/") + 1)}:${offset}`;
+    job.hermes = await hermesSession(job.logRecord);
+    await Deno.writeTextFile(logPath, JSON.stringify({ ...r, hermes: job.hermes }) + "\n", { append: true }).catch(() => {});
+  }
+  job.trajRecord = traceRecordId();
+  if (!job.deleted) trace({
     type: "job", ...r, page: job.page ?? null, clicks: job.clicks ?? [], named: job.named ?? [], screen: job.screen ?? [],
+    pageRoute: job.pageRoute ?? null, pageFiles: job.pageFiles ?? [],
     hintFiles: job.hintFiles ?? [], footprint: job.footprint ? [...job.footprint] : null, prompt: job.prompt ?? null,
     trace: job.trace ?? [], edits: job.edits ?? [],
   });
   job.finished.resolve(job);
+  if (job.deleted) scrubRecords([job]).catch(() => {});
 }
 
 let sayBroken = o.say === "none";
@@ -1780,6 +2540,15 @@ const trajectoryPath = (() => {
   return `${dir}/${stamp}-${o.port}.jsonl`;
 })();
 
+function traceRecordId(): string | undefined {
+  if (!trajectoryPath) return undefined;
+  let size = 0;
+  try { size = Deno.statSync(trajectoryPath).size; } catch { size = 0; }
+  const base = logPath.slice(0, logPath.lastIndexOf("/") + 1);
+  const name = trajectoryPath.startsWith(base) ? trajectoryPath.slice(base.length) : trajectoryPath.slice(trajectoryPath.lastIndexOf("/") + 1);
+  return `conversation:${name}:${size}`;
+}
+
 function trace(ev: Record<string, unknown>) {
   if (!trajectoryPath) return;
   try {
@@ -1789,8 +2558,8 @@ function trace(ev: Record<string, unknown>) {
 
 async function speaches(text: string): Promise<Uint8Array> {
   const r = await fetch(`${o.ttsUrl}/v1/audio/speech`, {
-    method: "POST", headers: JSON_H, signal: AbortSignal.timeout(15_000),
-    body: JSON.stringify({ model: "kokoro", input: text, voice: o.ttsVoice, speed: o.ttsSpeed, response_format: "wav" }),
+    method: "POST", headers: speechHeaders(), signal: AbortSignal.timeout(15_000),
+    body: JSON.stringify({ model: o.ttsModel, input: text, voice: o.ttsVoice, speed: o.ttsSpeed, response_format: "wav" }),
   });
   if (!r.ok) {
     const body = clip((await r.text()).replace(/\s+/g, " "), 160);
@@ -1854,6 +2623,21 @@ function speakText(text: string): Promise<number | undefined> {
   const started = Promise.withResolvers<number | undefined>();
   speechQueue = speechQueue.then(async () => {
     try {
+      if (o.say === "page") {
+        started.resolve(now());
+        let wav: Uint8Array | undefined;
+        try {
+          wav = padWav(await speaches(text), 450, 150);
+          if (lastSpeechError) say("speaches answers again");
+          lastSpeechError = "";
+        } catch (e) {
+          const msg = errText(e);
+          if (msg !== lastSpeechError) say(`${msg}; the page speaks with its own voice until it answers again`);
+          lastSpeechError = msg;
+        }
+        for (const c of clients) if (c.readyState === WebSocket.OPEN) c.send(wav ?? JSON.stringify({ ai: "speak", text }));
+        return;
+      }
       if (o.say !== "speaches") {
         const [cmd, ...args] = o.say.split(/\s+/);
         started.resolve(now());
@@ -1948,7 +2732,7 @@ async function attachVite() {
       const token = src.match(/const wsToken = "([^"]*)"/)?.[1];
       if (token === undefined) {
         throw new Error(`${base.origin}/@vite/client ${r.ok ? "is not a Vite client" : `answered ${r.status}`}: ` +
-          "no Vite dev server behind it. For dcl.one, put the umbrella in dev mode (ssh dcl, umbrella/scripts/up-dev.sh)");
+          "no Vite dev server behind it; start the site in dev mode first");
       }
       const port = src.match(/const hmrPort = (\d+)/)?.[1] ?? base.port;
       const proto = src.includes('const socketProtocol = "wss"') || base.protocol === "https:" ? "wss" : "ws";
@@ -2072,8 +2856,8 @@ function pushUpdate(rel: string, job?: Job) {
     : { type: "full-reload", seq: s, path });
 }
 
-const CLIENT = `(function (toast) {
-  var ws, pill, pillHost, pillTimer;
+const CLIENT = `(function (toast, mic, widget) {
+  var ws, pill, pillHost, pillTimer, stuck = "", listeners = [];
   var now = function () { return performance.timeOrigin + performance.now(); };
   function ack(seq) {
     var done = function (hidden) {
@@ -2082,7 +2866,8 @@ const CLIENT = `(function (toast) {
     if (document.visibilityState !== "visible") return done(true);
     requestAnimationFrame(function () { requestAnimationFrame(function () { done(false); }); });
   }
-  function show(msg, sticky) {
+  function show(msg, sticky, aside) {
+    if (widget && window.__aiWidgetShow) return window.__aiWidgetShow(msg);
     if (!toast) return;
     if (!pill) {
       pillHost = document.createElement("ai-status");
@@ -2095,10 +2880,12 @@ const CLIENT = `(function (toast) {
       shadow.appendChild(pill);
     }
     if (!pillHost.isConnected) document.documentElement.appendChild(pillHost);
+    if (!aside) stuck = sticky ? msg : "";
     pill.textContent = msg;
     pill.style.opacity = "1";
     clearTimeout(pillTimer);
-    if (!sticky) pillTimer = setTimeout(function () { pill.style.opacity = "0"; }, 5000);
+    if (aside && stuck) pillTimer = setTimeout(function () { pill.textContent = stuck; }, 4000);
+    else if (!sticky) pillTimer = setTimeout(function () { pill.style.opacity = "0"; }, 5000);
   }
   function samePage(path) {
     var here = location.pathname;
@@ -2117,31 +2904,868 @@ const CLIENT = `(function (toast) {
       l.after(n);
     });
   }
+  var parse = function (t) { return new DOMParser().parseFromString(t, "text/html"); };
+  var source;
+  if (window.Reveal) fetch(location.href, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (t) { source = t; });
+  function sections(el) {
+    return el ? Array.prototype.filter.call(el.children, function (c) { return c.tagName === "SECTION"; }) : [];
+  }
+  function scripts(doc) {
+    return Array.prototype.map.call(doc.querySelectorAll("script:not([src])"), function (s) { return s.textContent; }).join("\\n");
+  }
+  function highlight(el) {
+    var code = Reveal.getPlugin("highlight");
+    if (code) code.init({ getConfig: function () { return Reveal.getConfig(); }, getRevealElement: function () { return el; }, on: function () {} });
+  }
+  function swapDeck(doc, before) {
+    var live = document.querySelector(".reveal .slides"), next = doc.querySelector(".reveal .slides");
+    if (!before || !Reveal.isReady() || !live || !next || next.querySelector("[data-markdown]") || scripts(before) !== scripts(doc)) return false;
+    var ids = [], re = /(?:getElementById\\(\\s*|querySelector(?:All)?\\(\\s*)["']#?([\\w-]+)/g, m, text = scripts(doc);
+    while ((m = re.exec(text))) ids.push(m[1]);
+    var scripted = function (el) { return ids.some(function (id) { return el.id === id || el.querySelector("#" + CSS.escape(id)); }); };
+    var was = sections(before.querySelector(".reveal .slides")), fresh = sections(next), shown = sections(live);
+    var at = Reveal.getIndices();
+    if (was.length === fresh.length && fresh.length === shown.length) {
+      var changed = fresh.filter(function (s, i) { return s.outerHTML !== was[i].outerHTML; });
+      if (changed.some(scripted)) return false;
+      fresh.forEach(function (s, i) {
+        if (s.outerHTML === was[i].outerHTML) return;
+        var n = document.importNode(s, true);
+        shown[i].replaceWith(n);
+        highlight(n);
+      });
+    } else {
+      if (fresh.some(scripted)) return false;
+      live.innerHTML = next.innerHTML;
+      highlight(live);
+    }
+    Reveal.sync();
+    Reveal.slide(at.h, at.v, at.f);
+    return true;
+  }
   function html(path, seq) {
     if (!samePage(path)) return;
     fetch(location.href, { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (text) {
-      var doc = new DOMParser().parseFromString(text, "text/html");
+      var doc = parse(text), before = source && parse(source);
+      source = text;
+      if (window.Reveal && !swapDeck(doc, before)) return location.reload();
       var y = scrollY;
       document.head.querySelectorAll("style").forEach(function (s) { s.remove(); });
       doc.head.querySelectorAll("style").forEach(function (s) { document.head.appendChild(s); });
       document.title = doc.title;
-      document.body.replaceWith(doc.body);
-      scrollTo(0, y);
+      if (window.Reveal) report();
+      else {
+        document.body.replaceWith(doc.body);
+        scrollTo(0, y);
+      }
       ack(seq);
     });
   }
+  function report() {
+    if (!ws || ws.readyState !== 1 || window.top !== window) return;
+    var flat = function (t) { return t.replace(/\\s+/g, " ").trim(); };
+    var s = window.Reveal && Reveal.isReady() && Reveal.getCurrentSlide();
+    var h = s && s.querySelector("h1, h2, h3");
+    ws.send(JSON.stringify({ page: location.href,
+      slide: s ? { title: h ? flat(h.innerText) : "", text: flat(s.innerText).slice(0, 300) } : null }));
+  }
+  if (window.Reveal && Reveal.on) {
+    Reveal.on("ready", report);
+    Reveal.on("slidechanged", report);
+  }
+  addEventListener("hashchange", report);
+  var pushState = history.pushState, replaceState = history.replaceState;
+  history.pushState = function () { pushState.apply(this, arguments); setTimeout(report, 0); };
+  history.replaceState = function () { replaceState.apply(this, arguments); setTimeout(report, 0); };
+  addEventListener("popstate", report);
+  function tell(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
+  addEventListener("click", function (e) {
+    var t = e.target;
+    if (!t || !t.closest || t.closest("ai-status, ai-talk, ai-widget")) return;
+    var el = t.closest("button, a, [role=button], input, select, textarea, summary, label, [data-testid]") || t;
+    var cls = typeof el.className === "string" ? el.className.trim().split(/\\s+/).filter(Boolean).slice(0, 3) : [];
+    var sel = el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + cls.map(function (c) { return "." + c; }).join("") +
+      (el.dataset && el.dataset.testid ? ' [data-testid="' + el.dataset.testid + '"]' : "");
+    var text = String(el.innerText || el.value || el.getAttribute("aria-label") || "").trim().replace(/\\s+/g, " ").slice(0, 60);
+    tell({ click: "Click: " + Math.round(e.clientX) + "," + Math.round(e.clientY) + " on " + sel + (text ? " text: " + text : "") });
+  }, true);
+  var audio;
+  function play(blob) {
+    if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); }
+    audio = new Audio(URL.createObjectURL(blob));
+    audio.play().catch(function () {});
+  }
+  function speak(text) {
+    if (!window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  }
+  var talk, micOn = false, micWs, ctx, stream, node;
+  // the hot-mic guard: a visible live state, a silence window and a session cap, with a voice detector
+  // in the page telling speech from silence: TEN VAD, Silero v5 when it cannot run (served from this host under /__ai/vad/)
+  var guard = null, guardTimer, micVad = null, micSince = 0, micStop = null, live, liveHost, liveText, liveBtn, titleWas = null, vadReady = false, speaking = false, lastSpeechAt = 0;
+  var MIC_DEFAULTS = { silenceSec: 45, maxMin: 10 };
+  function micSettings() {
+    var s = {};
+    try { s = JSON.parse(localStorage.getItem("ai-widget-mic") || "{}") || {}; } catch (e) { s = {}; }
+    return { silenceSec: Number(s.silenceSec) > 0 ? Number(s.silenceSec) : MIC_DEFAULTS.silenceSec, maxMin: Number(s.maxMin) > 0 ? Number(s.maxMin) : MIC_DEFAULTS.maxMin, vad: s.vad !== false };
+  }
+  function setMicSettings(s) { try { localStorage.setItem("ai-widget-mic", JSON.stringify(s)); } catch (e) {} }
+  function beep(times) {
+    try {
+      var a = new (window.AudioContext || window.webkitAudioContext)();
+      for (var i = 0; i < (times || 1); i++) {
+        var osc = a.createOscillator(), g = a.createGain();
+        osc.frequency.value = 880; g.gain.value = 0.08;
+        osc.connect(g); g.connect(a.destination);
+        osc.start(a.currentTime + i * 0.25); osc.stop(a.currentTime + i * 0.25 + 0.15);
+      }
+      setTimeout(function () { a.close(); }, 1200);
+    } catch (e) {}
+  }
+  function mmss(ms) { var s = Math.max(0, Math.round(ms / 1000)); return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2); }
+  function liveBanner(on) {
+    if (!on) {
+      if (liveHost && liveHost.isConnected) liveHost.remove();
+      if (titleWas !== null) { document.title = titleWas; titleWas = null; }
+      return;
+    }
+    if (!liveHost) {
+      liveHost = document.createElement("ai-live");
+      liveHost.style.cssText = "position:fixed;left:50%;top:0;transform:translateX(-50%);z-index:2147483647";
+      var sh = liveHost.attachShadow({ mode: "closed" });
+      var st = document.createElement("style");
+      st.textContent = "@keyframes aipulse{0%,100%{opacity:1}50%{opacity:.25}}.b{display:flex;align-items:center;gap:10px;font:600 12px/1 system-ui,sans-serif;color:#fff;background:rgba(255,45,85,.96);padding:8px 14px;border-radius:0 0 12px 12px;box-shadow:0 6px 18px rgba(0,0,0,.35);white-space:nowrap}.b.warn{background:rgba(255,188,91,.98);color:#161518}.b i{width:9px;height:9px;border-radius:50%;background:#fff;animation:aipulse 1s ease-in-out infinite}.b.warn i{background:#161518}.b button{font:700 11px/1 system-ui,sans-serif;color:inherit;background:rgba(0,0,0,.18);border:0;border-radius:999px;padding:6px 10px;cursor:pointer}.b button:hover{background:rgba(0,0,0,.3)}";
+      live = document.createElement("div"); live.className = "b";
+      var dot = document.createElement("i");
+      liveText = document.createElement("span");
+      liveBtn = document.createElement("button"); liveBtn.textContent = "Stop"; liveBtn.onclick = function () { stopMic("stopped by you"); };
+      live.appendChild(dot); live.appendChild(liveText); live.appendChild(liveBtn);
+      sh.appendChild(st); sh.appendChild(live);
+    }
+    if (!liveHost.isConnected) document.documentElement.appendChild(liveHost);
+  }
+  function guardTick() {
+    if (!guard || !micOn) return;
+    var g = guard.tick(Date.now());
+    micState_ = g;
+    if (g.state === "stop") { stopMic(g.why); beep(2); show("Mic off: " + g.why, false); return; }
+    liveBanner(true);
+    var warn = g.state === "warning";
+    if (warn && !live.classList.contains("warn")) beep(1);
+    live.className = "b" + (warn ? " warn" : "");
+    liveText.textContent = warn ? g.why + " · say something to keep listening" : "LIVE · microphone on · " + mmss(g.elapsedMs) + (g.speaking ? " · hearing you" : "");
+    var prefix = warn ? "⚠ MIC " : "● LIVE · ";
+    var bare = (document.title || "").replace(/^(● LIVE · |⚠ MIC )/, "");
+    if (titleWas === null) titleWas = bare;
+    if (document.title !== prefix + bare) document.title = prefix + bare;
+  }
+  var micState_ = { state: "off" };
+  function micState() { return { on: micOn, since: micSince, speaking: speaking, lastSpeechAt: lastSpeechAt, vad: vadReady, guard: micState_, stopped: micStop, settings: micSettings() }; }
+  function vadScript(src) {
+    return new Promise(function (ok, no) {
+      var s = document.createElement("script"); s.src = src; s.async = true; s.onload = ok; s.onerror = function () { no(new Error("could not load " + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  var vadLoad = null;
+  function loadVad() {
+    if (vadLoad) return vadLoad;
+    vadLoad = vadScript("/__ai/vad/ort.min.js").then(function () { return vadScript("/__ai/vad/bundle.min.js"); });
+    vadLoad.catch(function () { vadLoad = null; });
+    return vadLoad;
+  }
+  function vadStart() { speaking = true; lastSpeechAt = Date.now(); if (guard) guard.speech(lastSpeechAt); if (micWs && micWs.readyState === 1) micWs.send(JSON.stringify({ vad: "start" })); }
+  function vadEnd() { speaking = false; lastSpeechAt = Date.now(); if (guard) guard.speechEnd(lastSpeechAt); if (micWs && micWs.readyState === 1) micWs.send(JSON.stringify({ vad: "end", at: lastSpeechAt })); }
+  function vadMisfire() { speaking = false; if (guard) guard.speechEnd(Date.now()); }
+  function startVad(s) {
+    if (!window.vad || !window.vad.MicVAD) throw new Error("the voice detector did not load");
+    return window.vad.MicVAD.new({
+      stream: s, model: "v5", baseAssetPath: "/__ai/vad/", onnxWASMBasePath: "/__ai/vad/",
+      ortConfig: function (ort) { ort.env.wasm.numThreads = 1; },
+      positiveSpeechThreshold: 0.5, negativeSpeechThreshold: 0.35, redemptionFrames: 12, minSpeechFrames: 3,
+      onSpeechStart: vadStart, onSpeechEnd: vadEnd, onVADMisfire: vadMisfire,
+    }).then(function (v) { v.start(); window.__aiVadEngine = "silero v5"; return v; });
+  }
+  // TEN VAD: 16 kHz, 256-sample hops (16 ms), a probability per hop; the worklet resamples the
+  // microphone to 16 kHz and posts Int16 hops, the main thread runs the WASM model and the turn
+  // detector (vad-turns.js) turns probabilities into the same start/end/misfire events as Silero.
+  var TEN_HOP = 256, TEN_RATE = 16000, tenLoad = null;
+  var TEN_WORKLET = [
+    "class TenVadFeed extends AudioWorkletProcessor {",
+    "  constructor() { super(); this.ratio = sampleRate / 16000; this.pos = 0; this.n = 0; this.acc = new Float32Array(256); this.carry = new Float32Array(0); }",
+    "  process(inputs) {",
+    "    var ch = inputs[0] && inputs[0][0]; if (!ch) return true;",
+    "    var buf = new Float32Array(this.carry.length + ch.length); buf.set(this.carry); buf.set(ch, this.carry.length);",
+    "    var i = this.pos;",
+    "    while (i + 1 < buf.length) {",
+    "      var i0 = Math.floor(i), f = i - i0;",
+    "      this.acc[this.n++] = buf[i0] * (1 - f) + buf[i0 + 1] * f;",
+    "      if (this.n === 256) {",
+    "        var out = new Int16Array(256);",
+    "        for (var k = 0; k < 256; k++) { var v = this.acc[k]; out[k] = v < 0 ? Math.max(-1, v) * 32768 : Math.min(1, v) * 32767; }",
+    "        this.port.postMessage(out, [out.buffer]); this.n = 0;",
+    "      }",
+    "      i += this.ratio;",
+    "    }",
+    "    var keep = Math.floor(i); this.carry = buf.slice(keep); this.pos = i - keep;",
+    "    return true;",
+    "  }",
+    "}",
+    "registerProcessor('ten-vad-feed', TenVadFeed);",
+  ].join("\\n");
+  function loadTen() {
+    if (tenLoad) return tenLoad;
+    tenLoad = import("/__ai/vad/ten_vad.js").then(function (m) { return (m.default || m.createVADModule)(); });
+    tenLoad.catch(function () { tenLoad = null; });
+    return tenLoad;
+  }
+  function startTenVad(s) {
+    if (!window.__aiVadTurns || !ctx || !ctx.audioWorklet) return Promise.reject(new Error("no AudioWorklet"));
+    return loadTen().then(function (M) {
+      var url = URL.createObjectURL(new Blob([TEN_WORKLET], { type: "text/javascript" }));
+      return ctx.audioWorklet.addModule(url).then(function () {
+        URL.revokeObjectURL(url);
+        var handlePtr = M._malloc(4), audioPtr = M._malloc(TEN_HOP * 2), probPtr = M._malloc(4), flagPtr = M._malloc(4);
+        if (M._ten_vad_create(handlePtr, TEN_HOP, 0.5) !== 0) { M._free(handlePtr); M._free(audioPtr); M._free(probPtr); M._free(flagPtr); throw new Error("ten_vad_create failed"); }
+        var handle = M.getValue(handlePtr, "i32"), version = M.UTF8ToString(M._ten_vad_get_version());
+        var turns = window.__aiVadTurns.createTurnDetector({ hopMs: 1000 * TEN_HOP / TEN_RATE, startThreshold: 0.5, endThreshold: 0.35, minSpeechMs: 96, redemptionMs: 320 });
+        var feed = ctx.createMediaStreamSource(s), worklet = new AudioWorkletNode(ctx, "ten-vad-feed", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+        var paused = false, gone = false;
+        worklet.port.onmessage = function (ev) {
+          if (paused || gone) return;
+          M.HEAP16.set(ev.data, audioPtr >> 1);
+          if (M._ten_vad_process(handle, audioPtr, TEN_HOP, probPtr, flagPtr) !== 0) return;
+          var turn = turns.feed(M.getValue(probPtr, "float"));
+          if (turn === "start") vadStart(); else if (turn === "end") vadEnd(); else if (turn === "misfire") vadMisfire();
+        };
+        feed.connect(worklet); worklet.connect(ctx.destination);
+        window.__aiVadEngine = "ten-vad " + version;
+        return {
+          pause: function () { paused = true; turns.reset(); },
+          destroy: function () {
+            if (gone) return; gone = true;
+            try { feed.disconnect(); worklet.disconnect(); } catch (e) {}
+            M._ten_vad_destroy(handlePtr); M._free(handlePtr); M._free(audioPtr); M._free(probPtr); M._free(flagPtr);
+          },
+        };
+      });
+    });
+  }
+  function startDetector(s) {
+    return startTenVad(s).catch(function (e) {
+      console.warn("[ai] TEN VAD unavailable, falling back to Silero:", e.message);
+      return loadVad().then(function () { return startVad(s); });
+    }).then(function (v) { micVad = v; vadReady = true; if (micWs && micWs.readyState === 1) micWs.send(JSON.stringify({ vad: "ready" })); return v; });
+  }
+  function startMic(opts) {
+    var st = micSettings();
+    opts = opts || {};
+    var silenceSec = opts.silenceSec || st.silenceSec, maxMin = opts.maxMin || st.maxMin, wantVad = opts.vad !== undefined ? opts.vad : st.vad;
+    return navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }).then(function (s) {
+      stream = s;
+      ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+      micWs = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/__ai/mic" + (window.__aiToken ? "?token=" + encodeURIComponent(window.__aiToken) : ""));
+      micWs.binaryType = "arraybuffer";
+      micWs.onopen = function () { if (vadReady) micWs.send(JSON.stringify({ vad: "ready" })); };
+      micWs.onclose = function () { if (micOn) show("the microphone link closed", false, true); };
+      var src = ctx.createMediaStreamSource(s);
+      node = ctx.createScriptProcessor(4096, 1, 1);
+      var ratio = ctx.sampleRate / 24000;
+      node.onaudioprocess = function (ev) {
+        if (!micWs || micWs.readyState !== 1) return;
+        var f = ev.inputBuffer.getChannelData(0), n = Math.floor(f.length / ratio), out = new Int16Array(n);
+        for (var i = 0; i < n; i++) { var v = f[Math.floor(i * ratio)]; out[i] = v < 0 ? Math.max(-1, v) * 32768 : Math.min(1, v) * 32767; }
+        micWs.send(out.buffer);
+      };
+      src.connect(node);
+      node.connect(ctx.destination);
+      micOn = true;
+      micSince = Date.now(); micStop = null; speaking = false; vadReady = false;
+      guard = window.__aiMicGuard ? window.__aiMicGuard.createMicGuard({ silenceSec: silenceSec, maxMin: maxMin }) : null;
+      if (guard) { guard.start(micSince); clearInterval(guardTimer); guardTimer = setInterval(guardTick, 500); guardTick(); }
+      show("listening · stops by itself after " + silenceSec + " s of silence", true);
+      if (wantVad) startDetector(s).catch(function (e) { console.warn("[ai] voice detector off:", e.message); show("voice detector off: " + e.message, false, true); });
+    });
+  }
+  function stopMic(why) {
+    if (micVad) { try { micVad.pause(); micVad.destroy && micVad.destroy(); } catch (e) {} micVad = null; }
+    if (micWs && micWs.readyState === 1 && why) { try { micWs.send(JSON.stringify({ vad: "stopped", why: why })); } catch (e) {} }
+    if (node) node.disconnect();
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    if (ctx) ctx.close();
+    if (micWs) micWs.close();
+    node = stream = ctx = micWs = null;
+    micOn = false; speaking = false; vadReady = false;
+    if (guard) guard.stop();
+    clearInterval(guardTimer);
+    micStop = { at: Date.now(), why: why || "stopped" };
+    micState_ = { state: "off" };
+    liveBanner(false);
+    show(why ? "Mic off: " + why : "microphone off", false);
+    listeners.forEach(function (f) { try { f({ ai: "mic", on: false, why: why || "stopped" }); } catch (err) {} });
+  }
+  function micButton() {
+    if (!mic || talk) return;
+    talk = document.createElement("ai-talk");
+    talk.style.cssText = "position:fixed;left:12px;bottom:12px;z-index:2147483647";
+    var shadow = talk.attachShadow({ mode: "closed" });
+    var b = document.createElement("button");
+    b.textContent = "Talk";
+    var off = "#c2410c", on = "#15803d";
+    b.style.cssText = "font:600 13px/1 system-ui,sans-serif;color:#fff;background:" + off + ";border:0;border-radius:999px;padding:10px 16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)";
+    b.onclick = function () {
+      if (micOn) {
+        stopMic();
+        b.textContent = "Talk";
+        b.style.background = off;
+        return;
+      }
+      startMic().then(function () {
+        b.textContent = "Stop";
+        b.style.background = on;
+      }, function (err) { show("microphone: " + err.message, false, true); });
+    };
+    shadow.appendChild(b);
+    document.documentElement.appendChild(talk);
+  }
   function connect() {
     ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/__hmr");
+    ws.onopen = report;
     ws.onmessage = function (e) {
+      if (typeof e.data !== "string") return play(e.data);
       var m = JSON.parse(e.data);
       if (m.type === "update") m.updates.forEach(function (u) { (u.type === "css-update" ? css : html)(u.path, m.seq); });
       else if (m.type === "full-reload") location.reload();
-      else if (m.ai === "status") show(m.msg, m.phase === "working");
+      else if (m.ai === "status") show(m.msg, m.phase === "working", m.phase === "heard");
+      else if (m.ai === "hearing" && guard && !vadReady) { lastSpeechAt = Date.now(); guard.speech(lastSpeechAt); setTimeout(function () { if (Date.now() - lastSpeechAt >= 1400 && !vadReady && guard) guard.speechEnd(Date.now()); }, 1500); }
+      else if (m.ai === "speak") speak(m.text);
+      else if (m.ai === "screen") tell({ screen: document.body ? document.body.innerText : "" });
+      if (m.ai) listeners.forEach(function (f) { try { f(m); } catch (err) { console.warn("[ai] widget listener", err); } });
     };
     ws.onclose = function () { setTimeout(connect, 500); };
   }
+  window.__ai = { tell: tell, on: function (f) { listeners.push(f); }, startMic: startMic, stopMic: stopMic, micOn: function () { return micOn; }, micState: micState, micSettings: micSettings, setMicSettings: setMicSettings };
   connect();
-})(${o.toast});`;
+  if (!widget) micButton();
+})(${o.toast}, ${Boolean(o.sttUrl)}, ${o.widget});`;
+
+const WIDGET_URL = new URL("./widget.js", import.meta.url);
+const GUARD_URL = new URL("./mic-guard.js", import.meta.url);
+const TURNS_URL = new URL("./vad-turns.js", import.meta.url);
+function clientScript(): string {
+  const guard = `${Deno.readTextFileSync(GUARD_URL)}\n${Deno.readTextFileSync(TURNS_URL)}`;
+  if (!o.widget) return `${guard}\n${CLIENT}`;
+  const cfg = { mic: Boolean(o.sttUrl), vad: o.vad, forge: o.forgePublicUrl || o.forgeUrl || null, repo: o.forgeRepo || null, hermes: o.hermesUrl || null,
+    smart: { on: smartOn(), claude: claudeAvailable, codex: codexAvailable, health: smartHealth, down: smartDown() ?? null } };
+  return `${guard}\n${CLIENT}\nwindow.__aiWidgetConfig = ${JSON.stringify(cfg)};\n${Deno.readTextFileSync(WIDGET_URL)}`;
+}
+
+// ------------------------------------------------------------------ the widget's records
+
+async function git(args: string[], cwd = root): Promise<{ ok: boolean; out: string; err: string }> {
+  const r = await new Deno.Command("git", { args: ["-C", cwd, ...args], stdout: "piped", stderr: "piped" }).output();
+  return { ok: r.success, out: new TextDecoder().decode(r.stdout), err: new TextDecoder().decode(r.stderr) };
+}
+
+function changeStatus(j: Job): string {
+  if (j.reverted) return "reverted";
+  if (j.cancelled) return "cancelled";
+  if (j.error) return "failed";
+  if (j.done === undefined) return "running";
+  if (j.write === undefined && !j.files.length) return "no-change";
+  return "done";
+}
+
+async function numstat(files: string[]): Promise<Map<string, { plus: number; minus: number }>> {
+  const m = new Map<string, { plus: number; minus: number }>();
+  if (!files.length) return m;
+  const r = await git(["diff", "--numstat", "HEAD", "--", ...files]);
+  for (const line of r.out.split("\n")) {
+    const [a, b, f] = line.split("\t");
+    if (f) m.set(f, { plus: Number(a) || 0, minus: Number(b) || 0 });
+  }
+  return m;
+}
+
+function changeRow(j: Job) {
+  const rel = (t?: number) => (t === undefined ? null : t - j.heard);
+  return {
+    id: j.id, text: j.text, source: j.source, route: j.route, lane: j.lane ?? null, status: changeStatus(j), files: j.files, plus: 0, minus: 0,
+    heard: new Date(j.heard).toISOString(), done: j.done ? new Date(j.done).toISOString() : null,
+    summary: j.summary ?? null, error: j.error ?? null, follows: j.follows?.id ?? null, pr: j.pr ?? null, who: j.who ?? null,
+    retryOf: j.retryOf ?? null, retriedAs: j.retriedAs ?? null, editOf: j.editOf ?? null,
+    hermes: j.hermes && o.hermesUrl ? { session: j.hermes, url: `${o.hermesUrl}/sessions/${j.hermes}?profile=widget` } : null,
+    ms: { dispatch: rel(j.dispatched), write: rel(j.write), hmr: rel(j.hmr), paint: rel(j.applied), done: rel(j.done) },
+  };
+}
+
+async function hermesSession(recordId: string): Promise<string> {
+  const identity = recordId.includes(":trajectories/") ? recordId.slice(0, recordId.lastIndexOf(":")) : recordId;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
+  return "widget-" + [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+}
+
+// A deleted request leaves a tombstone next to the log for the Hermes importer (which skips and purges it)
+// and its lines are scrubbed from the loop's own log and trajectory. The hot-mic case deletes a whole range.
+function tombstonePath(): string {
+  return logPath.slice(0, logPath.lastIndexOf("/") + 1) + "deleted.jsonl";
+}
+
+async function scrubRecords(gone: Job[], range?: { from: number; to?: number }) {
+  const ids = new Set(gone.map((j) => j.id));
+  const texts = gone.map((j) => j.text).filter(Boolean);
+  const stone = {
+    at: new Date().toISOString(),
+    jobs: gone.map((j) => ({ id: j.id, heard: new Date(j.heard).toISOString(), hermes: j.hermes ?? null,
+      records: [j.logRecord, j.trajRecord].filter(Boolean) })),
+    range: range ? { from: new Date(range.from).toISOString(), to: range.to ? new Date(range.to).toISOString() : null } : null,
+  };
+  await Deno.writeTextFile(tombstonePath(), JSON.stringify(stone) + "\n", { append: true, mode: 0o600 }).catch((e) => say(`delete: tombstone: ${errText(e)}`));
+  const inRange = (at?: string) => Boolean(range && at && Date.parse(at) >= range.from && (!range.to || Date.parse(at) <= range.to));
+  const drop = (line: string): boolean => {
+    let ev: Record<string, unknown>;
+    try { ev = JSON.parse(line); } catch { return false; }
+    const id = typeof ev.id === "number" ? ev.id : typeof ev.job === "number" ? ev.job : typeof ev.into === "number" ? ev.into : typeof ev.prev === "number" ? ev.prev : undefined;
+    if (id !== undefined && ids.has(id)) return true;
+    if (inRange(typeof ev.at === "string" ? ev.at : typeof ev.heard === "string" ? ev.heard : undefined)) return true;
+    const said = [ev.said, ev.text].filter((x) => typeof x === "string") as string[];
+    return said.some((s) => texts.some((x) => s.includes(x) || x.includes(s)));
+  };
+  for (const file of [logPath, trajectoryPath].filter(Boolean)) {
+    try {
+      const lines = (await Deno.readTextFile(file)).split("\n");
+      const kept = lines.filter((l) => !l.trim() || !drop(l));
+      if (kept.length !== lines.length) {
+        // in place, so the importer's cursor (inode + offset) resets instead of pointing at a vanished file
+        await Deno.writeTextFile(file, kept.join("\n"));
+      }
+    } catch (e) {
+      say(`delete: could not scrub ${file}: ${errText(e)}`);
+    }
+  }
+}
+
+async function deleteChange(j: Job, why = "widget"): Promise<string | null> {
+  if (j.deleted) return null;
+  if (j.done === undefined) stopChange(j);
+  if (changeStatus(j) === "done" && !j.pr) await revertChange(j);
+  j.deleted = true;
+  say(`#${j.id} deleted (${why}): ${clip(j.text, 80)}`);
+  return null;
+}
+
+async function changeList() {
+  const recent = jobs.filter((j) => !j.dry && !j.deleted).slice(-60);
+  const stats = await numstat([...new Set(recent.flatMap((j) => j.files))]);
+  const rel = (j: Job, t?: number) => (t === undefined ? null : t - j.heard);
+  return recent.map((j) => {
+    let plus = 0, minus = 0;
+    for (const f of j.files) {
+      const n = stats.get(f);
+      if (n) {
+        plus += n.plus;
+        minus += n.minus;
+      }
+    }
+    return { ...changeRow(j), plus, minus };
+  });
+}
+
+async function changeDetails(j: Job) {
+  const patch = j.files.length ? (await git(["diff", "HEAD", "--", ...j.files])).out : "";
+  const untracked = j.files.length ? (await git(["ls-files", "--others", "--exclude-standard", "--", ...j.files])).out.split("\n").filter(Boolean) : [];
+  return {
+    id: j.id,
+    patch: patch + untracked.map((f) => `diff --git a/${f} b/${f}\nnew file (not yet in git)\n`).join(""),
+    trace: j.trace ?? [],
+    edits: (j.edits ?? []).map((e) => ({ file: e.file, bytes: e.bytes ?? null })),
+    reply: j.reply ?? null,
+    error: j.error ?? null,
+    log: (j.log ?? []).map((l) => ({ at: new Date(l.t).toISOString(), text: l.text })),
+    lane: j.lane ?? null,
+    smart: { on: smartOn(), claude: claudeAvailable, codex: codexAvailable, health: smartHealth, down: smartDown() ?? null },
+  };
+}
+
+// a request said again to a smarter agent, with or without a word of clarification
+function retryChange(j: Job, clarification: string, who: Me | null): Job | { error: string } {
+  if (!claude) return { error: "this loop has no smart agent (start it with --claude-cmd or --codex-cmd)" };
+  if (!smartOn()) return { error: "the smart agent is off in Settings" };
+  if (j.done === undefined) stopChange(j);
+  const text = clarification ? `${j.text}\n\nClarification: ${clarification}` : j.text;
+  const job = newJob(j.source, text, "opus");
+  job.who = j.who ?? (who ? { address: who.address, name: who.name } : undefined);
+  job.retryOf = j.id;
+  j.retriedAs = job.id;
+  job.footprint = j.files.length ? new Set(j.files) : job.footprint;
+  say(`#${job.id} retries #${j.id} on ${smart}${clarification ? ` with: ${clip(clarification, 80)}` : ""}`);
+  status(job, "working", `…${clip(text, 60)}`);
+  return prepareThenSubmit(job);
+}
+
+async function editChange(j: Job, text: string): Promise<Job> {
+  if (j.dispatched === undefined && j.done === undefined) {
+    j.text = text;
+    say(`#${j.id} edited before it started: ${clip(text, 80)}`);
+    status(j, "working", `…${clip(text, 60)}`);
+    return j;
+  }
+  const gone = [j];
+  await deleteChange(j, "edited");
+  scrubRecords(gone).catch(() => {});
+  const job = newJob(j.source, text, j.route === "flash" ? "flash" : "opus");
+  job.who = j.who;
+  job.editOf = j.id;
+  say(`#${job.id} edits #${j.id}: ${clip(text, 80)}`);
+  status(job, "working", `…${clip(text, 60)}`);
+  return prepareThenSubmit(job);
+}
+
+async function revertChange(j: Job): Promise<string | null> {
+  if (changeStatus(j) !== "done") return "only a finished change can be reverted";
+  const tracked = (await git(["ls-files", "--", ...j.files])).out.split("\n").filter(Boolean);
+  const untracked = j.files.filter((f) => !tracked.includes(f));
+  if (tracked.length) {
+    const r = await git(["checkout", "--", ...tracked]);
+    if (!r.ok) return clip(r.err.replace(/\s+/g, " "), 200);
+  }
+  for (const f of untracked) {
+    try {
+      Deno.removeSync(`${root}/${f}`);
+    } catch { /* already gone */ }
+  }
+  j.reverted = true;
+  say(`#${j.id} reverted: ${j.files.join(", ")}`);
+  return null;
+}
+
+function stopChange(j: Job): string | null {
+  if (j.done !== undefined) return "already finished";
+  j.cancelled = true;
+  trace({ type: "cancel", job: j.id, text: "widget" });
+  for (const lane of ["flash", "claude"] as const) {
+    const i = queues[lane].indexOf(j);
+    if (i < 0) continue;
+    queues[lane].splice(i, 1);
+    j.done = now();
+    finish(j);
+    pump();
+    return null;
+  }
+  if (j.sid) opencode.interrupt(j.sid);
+  return null;
+}
+
+// ------------------------------------------------------------------ who is talking
+
+type Me = { address: string; name: string; token: string; at: number };
+const challenges = new Map<string, { challenge: string; at: number }>();
+const sessions = new Map<string, Me>();
+type Who = { address: string; name: string };
+/** Who said what, for the job the words become: an exact text first, else the last voice within 15 s. */
+const spoken: { text: string; who: Who; at: number }[] = [];
+function saidBy(text: string, who: Who | null) {
+  if (!who) return;
+  spoken.push({ text: text.trim().toLowerCase(), who, at: now() });
+  while (spoken.length > 50) spoken.shift();
+}
+function whoSaid(text: string): Who | undefined {
+  const t = text.trim().toLowerCase();
+  const exact = spoken.findLast((e) => e.text === t || e.text.includes(t) || t.includes(e.text));
+  if (exact) return exact.who;
+  const last = spoken.at(-1);
+  return last && now() - last.at < 15_000 ? last.who : undefined;
+}
+
+/** The widget's login token: its own header, because Authorization belongs to the basic-auth curtain a proxy may keep on the page. */
+function tokenOf(req: Request): string {
+  const own = req.headers.get("x-ai-token");
+  if (own) return own;
+  const a = req.headers.get("authorization") ?? "";
+  return a.startsWith("Bearer ") ? a.slice(7) : "";
+}
+function meOf(req: Request): Me | null {
+  const me = sessions.get(tokenOf(req));
+  return me && now() - me.at < 24 * 3600_000 ? me : null;
+}
+
+/** The protocol's chain, verified step by step; returns the root address or throws the reason. */
+async function verifyChain(chain: unknown, expectedPayload: string): Promise<string> {
+  const { isAddress, verifyMessage } = await import("npm:ethers@6");
+  type Step = { type: string; payload: string; signature: string };
+  if (!Array.isArray(chain) || chain.length < 2) throw new Error("a chain has at least two steps");
+  const steps = chain as Step[];
+  for (const st of steps) {
+    if (!st || typeof st.type !== "string" || typeof st.payload !== "string" || typeof st.signature !== "string") throw new Error("every step is {type, payload, signature}");
+  }
+  if (steps[0].type !== "SIGNER" || !isAddress(steps[0].payload) || steps[0].signature !== "") throw new Error("the first step is SIGNER with an address and no signature");
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  let authority = steps[0].payload;
+  for (let i = 1; i < steps.length - 1; i++) {
+    const st = steps[i];
+    if (st.type !== "ECDSA_EPHEMERAL") throw new Error(`step ${i}: only ECDSA_EPHEMERAL delegations are accepted`);
+    const m = /^(.+)\nEphemeral address: (0x[0-9a-fA-F]{40})\nExpiration: (.+)$/.exec(st.payload);
+    if (!m) throw new Error(`step ${i}: the delegation payload is purpose, Ephemeral address, Expiration`);
+    if (m[1] !== "Decentraland Login") throw new Error(`step ${i}: the purpose is "Decentraland Login"`);
+    const exp = Date.parse(m[3]);
+    if (!Number.isFinite(exp) || exp <= Date.now()) throw new Error(`step ${i}: the delegation expired`);
+    if (!same(verifyMessage(st.payload, st.signature), authority)) throw new Error(`step ${i}: not signed by ${authority}`);
+    authority = m[2];
+  }
+  const last = steps[steps.length - 1];
+  if (last.type !== "ECDSA_SIGNED_ENTITY") throw new Error("the last step is ECDSA_SIGNED_ENTITY");
+  if (last.payload !== expectedPayload) throw new Error("the last step does not sign this challenge");
+  if (!same(verifyMessage(last.payload, last.signature), authority)) throw new Error(`the challenge is not signed by ${authority}`);
+  return steps[0].payload.toLowerCase();
+}
+
+type Profile = { name: string; description: string; face: string };
+/** The Decentraland profile of an address: the attached catalyst first, then the public peer. */
+async function profileOf(address: string): Promise<Profile | null> {
+  const bases = [o.attach, "https://peer.decentraland.org"].filter(Boolean) as string[];
+  for (const base of bases) {
+    try {
+      const r = await fetch(`${base}/lambdas/profiles/${address}`, { signal: AbortSignal.timeout(4000) });
+      if (!r.ok) {
+        await r.body?.cancel();
+        continue;
+      }
+      const j = await r.json();
+      const a = j?.avatars?.[0];
+      if (!a?.name) continue;
+      return { name: String(a.name), description: typeof a.description === "string" ? a.description.trim() : "", face: String(a?.avatar?.snapshots?.face256 ?? "") };
+    } catch { /* the next */ }
+  }
+  return null;
+}
+async function nameOf(address: string): Promise<string> {
+  return (await profileOf(address))?.name ?? "";
+}
+/** The face snapshot's bytes: its own URL, else the content server by the CID in it. */
+async function faceOf(url: string): Promise<{ bytes: ArrayBuffer; type: string } | null> {
+  if (!url) return null;
+  const cid = url.split("/").find((s) => /^ba[fk][a-z2-7]{20,}$/.test(s) || /^Qm[1-9A-Za-z]{44}$/.test(s));
+  const urls = [url, ...(cid ? [`https://peer.decentraland.org/content/contents/${cid}`] : [])];
+  for (const u of urls) {
+    try {
+      const r = await fetch(u, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) {
+        await r.body?.cancel();
+        continue;
+      }
+      const bytes = await r.arrayBuffer();
+      if (!bytes.byteLength || bytes.byteLength > 1_000_000) continue;
+      const ct = r.headers.get("content-type")?.split(";")[0] ?? "";
+      return { bytes, type: ct.startsWith("image/") ? ct : "image/png" };
+    } catch { /* the next */ }
+  }
+  return null;
+}
+
+function randomId(bytes = 18): string {
+  const b = new Uint8Array(bytes);
+  crypto.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/[+/=]/g, "");
+}
+
+// ------------------------------------------------------------------ the pull request
+
+let prSeq = 0;
+function forgeToken(): string {
+  return keyFrom(o.forgeTokenFile, `--forge-token-file ${o.forgeTokenFile}`);
+}
+function forgeAdminToken(): string {
+  try {
+    return keyFrom(o.forgeAdminTokenFile, `--forge-admin-token-file ${o.forgeAdminTokenFile}`);
+  } catch {
+    return "";
+  }
+}
+type ForgeUser = { login: string; name: string; email: string; avatar: string };
+const forgeUsers = new Map<string, { at: number; user: ForgeUser | null }>();
+/** The Forgejo account registered (by dcl-oidc) for an address: it carries the synthetic email. */
+async function forgeUserOf(address: string, fresh = false): Promise<ForgeUser | null> {
+  if (!o.forgeUrl || !forgeAdminToken()) return null;
+  const hit = forgeUsers.get(address);
+  if (hit && !fresh && now() - hit.at < 60_000) return hit.user;
+  const mail = `${address}@${o.forgeEmailDomain}`;
+  const r = await forgeApi("GET", `/admin/emails/search?q=${encodeURIComponent(mail)}`, undefined, { admin: true });
+  const rows = Array.isArray(r.json) ? r.json as Record<string, unknown>[] : [];
+  const row = rows.find((e) => String(e.email).toLowerCase() === mail);
+  let user: ForgeUser | null = null;
+  if (row) {
+    const u = await forgeApi("GET", `/users/${encodeURIComponent(String(row.username))}`, undefined, { admin: true });
+    if (u.status === 200) {
+      user = { login: String(u.json.login), name: String(u.json.full_name || u.json.login), email: mail, avatar: String(u.json.avatar_url ?? "") };
+    }
+  }
+  forgeUsers.set(address, { at: now(), user });
+  return user;
+}
+/** A Forgejo-safe username from a Decentraland name: letters, digits, dot, dash, underscore; at most 40. */
+function forgeNameFor(address: string, name: string): string {
+  const cleaned = name.replace(/#/g, "-").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^[-._]+|[-._]+$/g, "").slice(0, 40);
+  return cleaned.length >= 2 ? cleaned : address.slice(2, 42);
+}
+const forgeMaking = new Map<string, Promise<ForgeUser | null>>();
+/**
+ * The Forgejo account of a verified Decentraland login, made on the spot when there is none: the
+ * site's login is the credential, so nobody signs in to Forgejo by hand. The account gets the
+ * Decentraland name, face and description; a later "Sign in with Decentraland" on Forgejo links
+ * to it by the synthetic email.
+ */
+function ensureForgeUser(address: string): Promise<ForgeUser | null> {
+  const pending = forgeMaking.get(address);
+  if (pending) return pending;
+  const p = (async () => {
+    const had = await forgeUserOf(address);
+    if (had || !o.forgeUrl || !forgeAdminToken()) return had;
+    const profile = await profileOf(address);
+    const mail = `${address}@${o.forgeEmailDomain}`;
+    const base = forgeNameFor(address, profile?.name ?? "");
+    let login = base, made: { status: number; json: Record<string, unknown> } | null = null;
+    for (const candidate of [base, `${base}-${address.slice(2, 8)}`]) {
+      login = candidate;
+      made = await forgeApi("POST", "/admin/users", {
+        username: candidate, email: mail, full_name: profile?.name || candidate, password: `${randomId(24)}Aa1!`,
+        must_change_password: false, send_notify: false, visibility: "public",
+      }, { admin: true });
+      if (made.status < 300) break;
+      if (!/already|exist|taken/i.test(JSON.stringify(made.json))) break;
+    }
+    if (!made || made.status >= 300) {
+      say(`forge: could not make an account for ${address}: ${made ? clip(JSON.stringify(made.json), 160) : "?"}`);
+      return null;
+    }
+    say(`forge: made ${login} for ${profile?.name || address}`);
+    const patch: Record<string, string> = { website: `https://decentraland.org/marketplace/accounts/${address}` };
+    if (profile?.description) patch.description = profile.description.slice(0, 255);
+    await forgeApi("PATCH", `/admin/users/${encodeURIComponent(login)}`, patch, { admin: true });
+    const face = await faceOf(profile?.face ?? "");
+    if (face) {
+      const b64 = btoa(Array.from(new Uint8Array(face.bytes), (c) => String.fromCharCode(c)).join(""));
+      const r = await forgeApi("POST", "/user/avatar", { image: b64 }, { sudo: login });
+      if (r.status >= 300) say(`forge: ${login}'s face was refused: ${r.status}`);
+    }
+    return await forgeUserOf(address, true);
+  })().finally(() => forgeMaking.delete(address));
+  forgeMaking.set(address, p);
+  return p;
+}
+async function forgeApi(method: string, path: string, body?: unknown, as: { admin?: boolean; sudo?: string } = {}): Promise<{ status: number; json: Record<string, unknown> }> {
+  const r = await fetch(`${o.forgeUrl}/api/v1${path}`, {
+    method,
+    headers: { ...JSON_H, authorization: `token ${as.admin || as.sudo ? forgeAdminToken() : forgeToken()}`, ...(as.sudo ? { sudo: as.sudo } : {}) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+  let j: Record<string, unknown> = {};
+  try {
+    j = await r.json();
+  } catch { /* no body */ }
+  return { status: r.status, json: j };
+}
+
+function openPullRequest(ids: number[], title: string, body: string, draft: boolean, who: Me | null): { id: number } | { error: string } {
+  if (!o.forgeUrl || !o.forgeRepo || !o.forgeTokenFile) return { error: "this loop has no forge: --forge-url, --forge-repo and --forge-token-file" };
+  if (!who) return { error: "sign in to Decentraland on this site first: a pull request carries only its sender's own changes" };
+  const asked = ids.map((id) => jobs.find((j) => j.id === id)).filter((j): j is Job => !!j && changeStatus(j) === "done" && j.files.length > 0 && !j.pr);
+  const picked = asked.filter((j) => j.who?.address === who.address);
+  if (asked.length && !picked.length) return { error: "none of those changes are yours; a pull request carries only its sender's own changes" };
+  if (!picked.length) return { error: "none of those changes can go into a pull request" };
+  title = title.trim() || `${picked.length} changes from ${who?.name || "the page"}`;
+  const id = ++prSeq;
+  const tell = (line: string, kind = "") => {
+    send({ ai: "pr", id, line, kind });
+    say(`pr #${id}: ${line}`);
+  };
+  (async () => {
+    const [owner, name] = o.forgeRepo.split("/");
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "changes";
+    const wt = `${tmp}/pr-${id}`;
+    const remote = `${o.forgeUrl}/${owner}/${name}.git`;
+    const cred = `credential.helper=!f() { echo username=${o.forgeUser}; echo password=${forgeToken()}; }; f`;
+    try {
+      // the pull request is the author's own: it needs their Forgejo account, which the Decentraland login makes
+      const author = await ensureForgeUser(who.address);
+      if (!author && forgeAdminToken()) {
+        throw new Error(`${(o.forgePublicUrl || o.forgeUrl).replace(/^https?:\/\//, "")} has no account for you and would not make one; the loop's log says why`);
+      }
+      const whoSlug = (author?.login || who.name || who.address.slice(2, 10)).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 20) || "team";
+      const branch = `agent/${whoSlug}-${slug}-${Date.now().toString(36)}`;
+      const sign = author
+        ? ["-c", `user.name=${author.name}`, "-c", `user.email=${author.email}`]
+        : ["-c", `user.name=${who.name || who.address} via agent-interactive`, "-c", `user.email=${who.address}@${o.forgeEmailDomain}`];
+      const repo = await forgeApi("GET", `/repos/${owner}/${name}`);
+      if (repo.status === 404) {
+        tell(`creating ${o.forgeRepo} on ${o.forgeUrl}`);
+        if (owner !== o.forgeUser) {
+          const org = await forgeApi("GET", `/orgs/${owner}`);
+          if (org.status === 404) {
+            const made = await forgeApi("POST", "/orgs", { username: owner, visibility: "public" });
+            if (made.status >= 300) throw new Error(`could not create the ${owner} organization: ${clip(JSON.stringify(made.json), 160)}`);
+          }
+        }
+        const made = await forgeApi("POST", owner === o.forgeUser ? "/user/repos" : `/orgs/${owner}/repos`, {
+          name, default_branch: o.forgeBase, private: false, description: "the working tree, as the agents edit it",
+        });
+        if (made.status >= 300) throw new Error(`could not create the repository: ${clip(JSON.stringify(made.json), 160)}`);
+        repo.json = made.json;
+      } else if (repo.status >= 300) throw new Error(`${o.forgeUrl} answered ${repo.status} for ${o.forgeRepo}`);
+      if (repo.json.empty === true) {
+        tell(`git push ${o.forgeBase} (the repository was empty)`);
+        const r = await git(["-c", cred, "push", "--no-verify", remote, `HEAD:refs/heads/${o.forgeBase}`]);
+        if (!r.ok) throw new Error(`push of ${o.forgeBase} failed: ${clip(r.err.replace(/\s+/g, " "), 200)}`);
+      }
+      tell(`git checkout -b ${branch}`);
+      await git(["worktree", "remove", "--force", wt]);
+      const add = await git(["worktree", "add", "-b", branch, wt, "HEAD"]);
+      if (!add.ok) throw new Error(`worktree: ${clip(add.err.replace(/\s+/g, " "), 200)}`);
+      const files = new Set<string>();
+      for (const j of picked) {
+        for (const f of j.files) {
+          files.add(f);
+          try {
+            Deno.mkdirSync(`${wt}/${f}`.replace(/\/[^/]+$/, ""), { recursive: true });
+            Deno.copyFileSync(`${root}/${f}`, `${wt}/${f}`);
+          } catch {
+            try {
+              Deno.removeSync(`${wt}/${f}`);
+            } catch { /* gone on both sides */ }
+          }
+        }
+        await git(["add", "-A", "--", ...j.files], wt);
+        const msg = `${clip(j.text.replace(/\s+/g, " "), 72)}\n\nAsked on the page: "${j.text}"\nR-${j.id} via agent-interactive`;
+        const c = await git([...sign, "commit", "-q", "-m", msg], wt);
+        tell(`${c.ok ? "commit" : "nothing to commit for"} R-${j.id}: ${clip(j.text, 60)}`);
+      }
+      tell(`Apply ${picked.map((j) => `R-${j.id}`).join(", ")} · ${files.size} files`);
+      tell(`git push ${(o.forgePublicUrl || o.forgeUrl).replace(/^https?:\/\//, "")} ${branch}`);
+      const push = await git(["-c", cred, "push", "--no-verify", "-u", remote, branch], wt);
+      if (!push.ok) throw new Error(`push failed: ${clip(push.err.replace(/\s+/g, " "), 200)}`);
+      tell(`Opening ${draft ? "draft " : ""}pull request${author ? ` as ${author.login}` : ""}…`);
+      const prBody = { head: branch, base: o.forgeBase, title: draft ? `WIP: ${title}` : title, body };
+      let pr = await forgeApi("POST", `/repos/${owner}/${name}/pulls`, prBody, author ? { sudo: author.login } : {});
+      if (author && pr.status >= 300) {
+        tell(`Forgejo would not open it as ${author.login} (${pr.status}); opening it as ${o.forgeUser}`, "warn");
+        pr = await forgeApi("POST", `/repos/${owner}/${name}/pulls`, prBody);
+      }
+      if (pr.status >= 300) throw new Error(`pull request refused: ${clip(JSON.stringify(pr.json), 200)}`);
+      const number = Number(pr.json.number), url = String(pr.json.html_url ?? `${o.forgePublicUrl || o.forgeUrl}/${o.forgeRepo}/pulls/${number}`);
+      for (const j of picked) j.pr = { number, url };
+      await git(["worktree", "remove", "--force", wt]);
+      send({ ai: "pr", id, state: "done", result: { number, url, branch, title, draft, count: picked.length, files: files.size } });
+      say(`pr #${id}: ${url}`);
+    } catch (e) {
+      tell(errText(e), "bad");
+      send({ ai: "pr", id, state: "failed" });
+      await git(["worktree", "remove", "--force", wt]);
+    }
+  })();
+  return { id };
+}
+
 
 let replaying: Promise<unknown> = Promise.resolve();
 
@@ -2166,7 +3790,8 @@ function replay(c: { context?: string[]; screen?: string[]; said?: string[] }, m
         if (job) started.push(job);
       }
       const done = await Promise.all(started.map((j) => j.finished.promise));
-      return { gates, jobs: done.map((j) => ({ ...record(j), planned: plannedFile(j), named: j.named ?? [], hintFiles: j.hintFiles ?? [] })) };
+      return { gates, jobs: done.map((j) => ({ ...record(j), planned: plannedFile(j), named: j.named ?? [], hintFiles: j.hintFiles ?? [],
+        pageRoute: j.pageRoute ?? null, pageFiles: j.pageFiles ?? [] })) };
     } finally {
       screenOverride = undefined;
     }
@@ -2189,9 +3814,10 @@ function statusJson() {
   const view = (j: Job) => ({ id: j.id, text: clip(j.text, 160), route: j.route, source: j.source, heard: j.heard, follows: j.follows?.id ?? null });
   return {
     page: pageUrl, port: o.port, now: now(), attach: Boolean(o.attach), viteUp: o.attach ? viteUp : null,
+    smartHealth, smartDown: smartDown() ?? null,
     recgo: o.recgo ? Boolean(recgo) : null, speech: o.say, speechError: lastSpeechError || null,
-    gate: o.gateUrl ? `${o.gateUrl} (${o.gateModel})` : "keywords", lastVerdict, held: heardBuf.map((h) => h.text),
-    muted,
+    gate: o.gateUrl ? `${o.gateUrl} (${o.gateModel}${o.gateChat ? ", chat" : ""})` : "keywords", lastVerdict, held: heardBuf.map((h) => h.text),
+    heard: lastHeard ?? null, muted,
     workers: workers.map((w) => {
       const t = terms.get(w.name);
       return {
@@ -2221,7 +3847,7 @@ const json = (v: unknown, status = 200) =>
   new Response(JSON.stringify(v, null, 1) + "\n", { status, headers: JSON_H });
 
 const LOCAL_HOSTS = new Set([`127.0.0.1:${o.port}`, `localhost:${o.port}`, `[::1]:${o.port}`]);
-const APP_ORIGINS = new Set(["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"]);
+const APP_ORIGINS = new Set(["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", ...o.origins]);
 
 function foreign(req: Request): string | undefined {
   const host = req.headers.get("host") ?? "";
@@ -2264,6 +3890,14 @@ async function handle(req: Request): Promise<Response> {
     socket.onmessage = (e) => {
       try {
         const m = JSON.parse(e.data);
+        if (typeof m.click === "string") onRecgoLine(`${stamp()}  ${m.click}`);
+        if (typeof m.screen === "string") for (const w of screenWaiters.splice(0)) w(m.screen);
+        if (typeof m.page === "string") {
+          visit(m.page);
+          slide = typeof m.slide?.text === "string"
+            ? { page: m.page, title: String(m.slide.title ?? "").slice(0, 200), text: m.slide.text.slice(0, 300) }
+            : undefined;
+        }
         const job = typeof m.ack === "number" ? seqJob.get(m.ack) : undefined;
         if (job && job.applied === undefined) {
           job.applied = Math.max(Math.round(m.t), job.hmr ?? 0);
@@ -2274,10 +3908,114 @@ async function handle(req: Request): Promise<Response> {
     };
     return response;
   }
+  if (path === "/__ai/client.js") return new Response(clientScript(), { headers: { "content-type": MIME.js, "cache-control": "no-store" } });
+  if (path === "/__ai/changes") return json(await changeList());
+  {
+    const m = /^\/__ai\/changes\/(\d+)(?:\/(revert|stop|delete|delete-after|edit|retry|clarify))?$/.exec(path);
+    if (m) {
+      const job = jobs.find((j) => j.id === Number(m[1]));
+      if (!job || job.deleted) return json({ error: `no change ${m[1]}` }, 404);
+      if (!m[2]) return json(await changeDetails(job));
+      if (req.method !== "POST") return json({ error: "POST" }, 405);
+      const body = async () => ((await req.json().catch(() => ({}))) as { text?: unknown });
+      switch (m[2]) {
+        case "revert":
+        case "stop": {
+          const err = m[2] === "revert" ? await revertChange(job) : stopChange(job);
+          return err ? json({ error: err }, 409) : json({ ok: true, status: changeStatus(job) });
+        }
+        case "delete": {
+          await deleteChange(job);
+          scrubRecords([job]).catch(() => {});
+          return json({ ok: true, deleted: [job.id] });
+        }
+        case "delete-after": {
+          // the hot-mic case: this request and everything heard after it go, records included
+          const gone = jobs.filter((j) => !j.deleted && !j.dry && j.heard >= job.heard);
+          for (const g of gone) await deleteChange(g, "delete-after");
+          heardBuf.length = 0;
+          if (settling) clearTimeout(settling.timer);
+          settling = undefined;
+          scrubRecords(gone, { from: job.heard }).catch(() => {});
+          return json({ ok: true, deleted: gone.map((g) => g.id) });
+        }
+        case "edit": {
+          const text = String((await body()).text ?? "").trim();
+          if (!text) return json({ error: "empty" }, 400);
+          const next = await editChange(job, text);
+          return json({ ok: true, id: next.id, replaced: next.id !== job.id });
+        }
+        case "retry":
+        case "clarify": {
+          const text = m[2] === "clarify" ? String((await body()).text ?? "").trim() : "";
+          if (m[2] === "clarify" && !text) return json({ error: "empty" }, 400);
+          const r = retryChange(job, text, meOf(req));
+          return "error" in r ? json(r, 409) : json({ ok: true, id: r.id });
+        }
+      }
+    }
+  }
+  if (path.startsWith("/__ai/vad/")) {
+    // the in-page voice detectors: TEN VAD (WASM) and Silero's model with its worklet and onnxruntime-web, from this host only
+    const name = path.slice("/__ai/vad/".length);
+    if (!o.vad || !/^[\w.-]+$/.test(name)) return new Response("not found\n", { status: 404 });
+    try {
+      const file = await Deno.open(new URL(`./vad/${name}`, import.meta.url));
+      const ext = name.slice(name.lastIndexOf(".") + 1);
+      const type = ext === "wasm" ? "application/wasm" : ext === "onnx" ? "application/octet-stream" : ext === "js" || ext === "mjs" ? MIME.js : "application/octet-stream";
+      return new Response(file.readable, { headers: { "content-type": type, "cache-control": "public, max-age=604800, immutable" } });
+    } catch {
+      return new Response("not found\n", { status: 404 });
+    }
+  }
+  if (path === "/__ai/challenge") {
+    const id = randomId();
+    const challenge = `${o.origins[0] ?? "agent-interactive"} agent\nChallenge: ${randomId(12)}\nIssued: ${new Date().toISOString()}`;
+    challenges.set(id, { challenge, at: now() });
+    for (const [k, v] of challenges) if (now() - v.at > 600_000) challenges.delete(k);
+    return json({ id, challenge });
+  }
+  if (path === "/__ai/login" && req.method === "POST") {
+    const b = await req.json().catch(() => ({}));
+    const ch = challenges.get(String(b.id ?? ""));
+    if (!ch || now() - ch.at > 600_000) return json({ error: "this challenge expired; reload" }, 410);
+    challenges.delete(String(b.id));
+    try {
+      const address = await verifyChain(b.chain, ch.challenge);
+      const me: Me = { address, name: await nameOf(address), token: randomId(24), at: now() };
+      sessions.set(me.token, me);
+      say(`signed in: ${me.name} (${address})`);
+      return json({ address, name: me.name, token: me.token, forge: await ensureForgeUser(address) });
+    } catch (e) {
+      say(`sign-in refused: ${errText(e)}`);
+      return json({ error: errText(e) }, 401);
+    }
+  }
+  if (path === "/__ai/settings") {
+    if (req.method === "POST") {
+      const b = await req.json().catch(() => ({}));
+      const err = applySettings(b);
+      if (err) return json({ error: err }, 400);
+    }
+    return json({ settings: settingsNow(), choices: settingsChoices(), lanes: { claude: claudeAvailable, codex: codexAvailable } });
+  }
+  if (path === "/__ai/me") {
+    const me = meOf(req);
+    return json(me ? { address: me.address, name: me.name, forge: await ensureForgeUser(me.address) } : { address: null });
+  }
+  if (path === "/__ai/pr" && req.method === "POST") {
+    const b = await req.json().catch(() => ({}));
+    const ids = Array.isArray(b.ids) ? b.ids.map(Number).filter(Number.isInteger) : [];
+    const r = openPullRequest(ids, String(b.title ?? ""), String(b.body ?? ""), b.draft !== false, meOf(req));
+    return "error" in r ? json(r, 400) : json(r);
+  }
+  if (path === "/__ai/mic") return micSocket(req);
   if (path === "/__ai/say" && req.method === "POST") {
     const text = (await req.text()).trim();
     if (!text) return json({ error: "empty" }, 400);
     const source = url.searchParams.get("source") ?? "http";
+    const sayer = meOf(req);
+    if (sayer) saidBy(text, { address: sayer.address, name: sayer.name });
     const job = source === "narration" ? await onNarration(text) : enqueue(source, text, undefined, url.searchParams.has("dry"));
     if (!job) return json({ queued: false, verdict: lastVerdict });
     return url.searchParams.has("wait") ? json(record(await job.finished.promise)) : json({ id: job.id });
@@ -2344,7 +4082,7 @@ async function handle(req: Request): Promise<Response> {
     const headers = { "content-type": MIME[ext] ?? "application/octet-stream", "cache-control": "no-store" };
     if (ext === "html" || ext === "htm") {
       const text = await Deno.readTextFile(file);
-      const tag = `<script>${CLIENT}</script>`;
+      const tag = `<script>${clientScript()}</script>`;
       const body = /<\/body>/i.test(text) ? text.replace(/<\/body>/i, `${tag}\n</body>`) : text + tag;
       return new Response(body, { headers });
     }
@@ -2407,8 +4145,49 @@ const GATE_OPTIONS = {
   none: "not a request to change the page",
 };
 
+let gateKey: string | undefined;
+function gateKeyValue(): string {
+  if (gateKey === undefined) {
+    try { gateKey = o.gateKeyFile ? Deno.readTextFileSync(o.gateKeyFile).trim() : ""; } catch { gateKey = ""; }
+  }
+  return gateKey;
+}
+
+/** The same question as /v1/systemone, asked of an OpenAI-compatible server as a forced tool call. */
+async function chatVerdict(state: string): Promise<{ choice: string; p?: number }> {
+  const key = gateKeyValue();
+  if (o.gateKeyFile && !key) throw new Error(`gate key file ${o.gateKeyFile} is missing or empty`);
+  const criteria = Object.entries(GATE_OPTIONS).map(([k, v]) => `${k}: ${v}.`).join(" ");
+  const r = await fetch(`${o.gateUrl}/v1/chat/completions`, {
+    method: "POST", headers: key ? { ...JSON_H, authorization: `Bearer ${key}` } : JSON_H, signal: AbortSignal.timeout(4000),
+    body: JSON.stringify({
+      model: o.gateModel, temperature: 0, max_tokens: 400, reasoning: { effort: "none", exclude: true },
+      messages: [
+        { role: "system", content: `Someone is talking while looking at a web page an assistant can edit. Decide what their latest words ask for and call gate with the verdict, nothing else. ${criteria}` },
+        { role: "user", content: state },
+      ],
+      tools: [{ type: "function", function: { name: "gate", description: "the verdict", parameters: {
+        type: "object", properties: { choice: { type: "string", enum: Object.keys(GATE_OPTIONS) } }, required: ["choice"] } } }],
+      tool_choice: { type: "function", function: { name: "gate" } },
+    }),
+  });
+  if (!r.ok) throw new Error(`gate ${r.status}: ${clip(await r.text(), 120)}`);
+  const body = await r.json();
+  const msg = body?.choices?.[0]?.message;
+  let choice: unknown;
+  const args = msg?.tool_calls?.[0]?.function?.arguments;
+  if (typeof args === "string") { try { choice = JSON.parse(args)?.choice; } catch { choice = undefined; } }
+  if (choice === undefined && typeof msg?.content === "string") {
+    const m = msg.content.match(/\b(small|large|incomplete|none)\b/gi);
+    if (m) choice = m[m.length - 1].toLowerCase();
+  }
+  if (typeof choice !== "string" || !(choice in GATE_OPTIONS)) throw new Error(`gate answered ${clip(JSON.stringify(msg ?? body), 120)}`);
+  return { choice };
+}
+
 async function systemoneVerdict(heard: string[]): Promise<{ choice: string; p?: number }> {
   const state = `Page: ${pageUrl}\n${contextBlock()}They said, oldest first:\n${heard.map((h) => `- ${h}`).join("\n")}`;
+  if (o.gateChat) return chatVerdict(state);
   const r = await fetch(`${o.gateUrl}/v1/systemone`, {
     method: "POST", headers: JSON_H, signal: AbortSignal.timeout(2000),
     body: JSON.stringify({
@@ -2429,6 +4208,8 @@ let gateChain: Promise<unknown> = Promise.resolve();
 let gateDown = false;
 let lastHearing = 0;
 let lastNarration = 0;
+let vadEndAt = 0;
+let vadStartAt = 0;
 let settling: { verdict: string; gateMs: number; since: number; timer?: ReturnType<typeof setTimeout> } | undefined;
 
 const DANGLING = /\b(a|an|the|this|that|these|those|to|of|for|with|and|or|but|so|we|i|you|it|can|could|should|would|will|is|are|be|like|in|on|at|from|by|into|our|my|your|their|then|than|if|when|because|let'?s)$/i;
@@ -2490,15 +4271,7 @@ Answer with one word. APPEND only if what they just said belongs to the previous
 function followUp(prev: Job, text: string, verdict: string, gateMs: number, settleMs?: number): Job {
   if (prev.dispatched === undefined) {
     prev.text = `${prev.text} ${text}`;
-    if (verdict === "large" && claude && prev.route === "flash") {
-      prev.route = "opus";
-      const i = queues.flash.indexOf(prev);
-      if (i >= 0) {
-        queues.flash.splice(i, 1);
-        queues.claude.push(prev);
-        pump();
-      }
-    }
+    if (verdict === "large" && claude && prev.route === "flash" && toClaude(prev)) pump();
     say(`#${prev.id} + ${clip(text, 100)} (joined it before it started)`);
     status(prev, "working", `…${clip(prev.text, 60)}`);
     trace({ type: "joined", into: prev.id, text });
@@ -2510,13 +4283,7 @@ function followUp(prev: Job, text: string, verdict: string, gateMs: number, sett
   job.settleMs = settleMs;
   say(`#${job.id} heard (narration), follows #${prev.id}: ${clip(text, 100)}`);
   status(job, "working", `…${clip(text, 60)}`);
-  preparing.add(job);
-  prepare(job).catch(() => {}).finally(() => {
-    preparing.delete(job);
-    bindFollow(job);
-    submit(job);
-  });
-  return job;
+  return prepareThenSubmit(job);
 }
 
 function isRepeat(prev: Job, said: string): boolean {
@@ -2579,7 +4346,9 @@ async function flushPending() {
   const said = heardBuf.map((h) => h.text).join(" ");
   const held = now() - p.since;
   const quiet = now() - Math.max(lastHearing, lastNarration);
-  if (held < 8000 && (quiet < o.settle || (dangling(said) && held < 5000))) return flushLater(200);
+  // the page's voice detector saw the speech end after this request began: no need to wait out --settle
+  const vadQuiet = vadEndAt >= p.since - 1500 && vadEndAt >= vadStartAt && now() - vadEndAt >= 150;
+  if (held < 8000 && !vadQuiet && (quiet < o.settle || (dangling(said) && held < 5000))) return flushLater(200);
   const kept = continuation(heardBuf, p.since);
   settling = undefined;
   heardBuf.length = 0;
@@ -2655,20 +4424,24 @@ setInterval(() => {
   speakText(`Still working on ${long.map((w) => `number ${w.job!.id}, ${mins(w)} minutes in`).join("; ")}.`);
 }, 30_000);
 
+let lastHeard: { at: number; text: string; outcome: string } | undefined;
+
+function heardNothing(text: string, outcome: string, held = false) {
+  lastHeard = { at: now(), text: clip(text, 160), outcome };
+  send({ ai: "status", phase: "heard", msg: `Heard "${clip(text, 60)}": ${outcome}`, held: held ? clip(text, 400) : undefined });
+}
+
 function onNarration(text: string, mode: GateMode = "live", settle = false): Promise<Job | undefined> {
   const said = text.trim().replace(/^[.,…\s]+/, "");
-  if (mode === "live" && UNMUTE.test(said)) {
-    setMuted(false, "voice");
-    return Promise.resolve(undefined);
-  }
-  if (mode === "live" && MUTE.test(said)) {
-    setMuted(true, "voice");
-    return Promise.resolve(undefined);
-  }
-  if (mode === "live" && muted) {
-    say(`muted, not acted on: ${clip(said, 100)}`);
-    trace({ type: "muted", text: said });
-    return Promise.resolve(undefined);
+  if (mode === "live") {
+    const toggle = UNMUTE.test(said) ? false : MUTE.test(said) ? true : undefined;
+    if (toggle !== undefined) setMuted(toggle, "voice");
+    else if (muted) {
+      say(`muted, not acted on: ${clip(said, 100)}`);
+      trace({ type: "muted", text: said });
+      heardNothing(said, "muted, nothing done");
+    }
+    if (toggle !== undefined || muted) return Promise.resolve(undefined);
   }
   const run = gateChain.then(async () => {
     const t = now();
@@ -2682,6 +4455,7 @@ function onNarration(text: string, mode: GateMode = "live", settle = false): Pro
       say(`${aside === "cancel" ? "cancel" : "about the tool, not acted on"}: ${clip(text, 100)}`);
       trace({ type: "gate", text, verdict: "none", method: aside, ms: 0, held: heardBuf.map((h) => h.text), mode });
       if (aside === "cancel" && mode === "live") cancelLatest(text);
+      else if (mode === "live") heardNothing(text, "about the tool, nothing done");
       return undefined;
     }
     let verdict = keywordVerdict(text);
@@ -2712,7 +4486,10 @@ function onNarration(text: string, mode: GateMode = "live", settle = false): Pro
       return undefined;
     }
     if (verdict === "none" && judged) heardBuf.length = 0;
-    if (!request) return undefined;
+    if (!request) {
+      if (mode === "live") heardNothing(text, verdict === "incomplete" ? "waiting for the rest" : "not taken as a request (say what to change, or click the element first)", verdict !== "incomplete");
+      return undefined;
+    }
     const said = continuation(heardBuf, t);
     heardBuf.length = 0;
     if (mode === "gate") return undefined;
@@ -2744,6 +4521,16 @@ let recgoIn: WritableStreamDefaultWriter<Uint8Array> | undefined;
 const CLICK = /^\d\d\.\d\d\.\d\d\s+Click:/;
 const PAGE_ERROR = /^\d\d\.\d\d\.\d\d\s+Error:\s*(.*)$/;
 
+function visit(url: string): boolean {
+  const moved = !lastPage || !samePath(url, lastPage);
+  lastPage = url;
+  if (moved) {
+    clicks.length = 0;
+    pageErrors.clear();
+  }
+  return moved;
+}
+
 function samePath(a: string, b: string): boolean {
   try {
     const x = new URL(a), y = new URL(b);
@@ -2760,6 +4547,10 @@ function onRecgoLine(line: string) {
   }
   if (!/^\d\d\.\d\d\.\d\d\s+(console\.|hearing:)/.test(line)) trace({ type: "recgo", line });
   const err = line.match(PAGE_ERROR);
+  if (err && offPage()) {
+    console.log(`recgo| ${line}`);
+    return;
+  }
   if (err) {
     const key = err[1].replace(/(https?:\/\/[^\s?#]+)[?#]\S*/g, "$1").replace(/\d+/g, "N").slice(0, 160);
     const seen = pageErrors.get(key);
@@ -2781,12 +4572,8 @@ function onRecgoLine(line: string) {
   }
   const nav = line.match(/\b(?:Navigate|Tab): (\S+)/)?.[1];
   if (nav) {
-    const moved = !lastPage || !samePath(nav, lastPage);
-    lastPage = nav;
-    if (!moved) return;
-    clicks.length = 0;
-    pageErrors.clear();
-  } else if (CLICK.test(line)) {
+    if (!visit(nav)) return;
+  } else if (CLICK.test(line) && !offPage() && !WIDGET_CLICK.test(line)) {
     clicks.push(line.trim());
     if (clicks.length > 4) clicks.shift();
   }
@@ -2840,7 +4627,7 @@ async function startRecgo() {
     recgo = new Deno.Command("recgo-tab", { args: [...args, ...o.recgoArgs], stdin: "piped", stdout: "piped", stderr: "piped" })
       .spawn();
   } catch (e) {
-    if (e instanceof Deno.errors.NotFound) die("--recgo needs recgo-tab on PATH (programs.recgo in the fleet config)");
+    if (e instanceof Deno.errors.NotFound) die("--recgo needs recgo-tab on PATH (programs.recgo on a NixOS host config)");
     throw e;
   }
   recgoIn = recgo.stdin.getWriter();
@@ -2885,11 +4672,15 @@ type Check = { id: string; title: string; state: "ok" | "warn" | "fail" | "skip"
 async function doctor(): Promise<never> {
   const checks: Check[] = [];
   const mark = { ok: "✓", warn: "!", fail: "✗", skip: "·" };
-  const add = (c: Check) => {
-    checks.push(c);
+  const titles: Record<string, string> = {
+    deno: "Deno", tools: "rg, git, curl", page: "Page", fast: "Fast lane", write: "Fast lane writes", claude: "Claude",
+    pty: "Agent terminals", trust: "Folder trust", voice: "Voice", speech: "Spoken replies",
+  };
+  const add = (id: string, state: Check["state"], detail: string, fix?: string) => {
+    checks.push({ id, title: titles[id], state, detail, fix });
     if (doctorJson) return;
-    console.log(`${mark[c.state]} ${c.title.padEnd(18)} ${c.detail}`);
-    if (c.fix && c.state !== "ok") console.log(`  ${" ".repeat(18)} → ${c.fix}`);
+    console.log(`${mark[state]} ${titles[id].padEnd(18)} ${detail}`);
+    if (fix && state !== "ok") console.log(`  ${" ".repeat(18)} → ${fix}`);
   };
   const onPath = (cmd: string) => {
     if (!cmd.includes("/")) return which(cmd) !== cmd;
@@ -2907,13 +4698,10 @@ async function doctor(): Promise<never> {
     Promise.race([p, delay(ms).then(() => { throw new Error(`${what} did not answer within ${ms / 1000} s`); })]);
 
   const major = Number(Deno.version.deno.split(".")[0]);
-  add({ id: "deno", title: "Deno", state: major >= 2 ? "ok" : "fail", detail: Deno.version.deno, fix: "install Deno 2 or newer" });
+  add("deno", major >= 2 ? "ok" : "fail", Deno.version.deno, "install Deno 2 or newer");
   const missing = ["rg", "git", "curl"].filter((c) => !onPath(c));
-  add({
-    id: "tools", title: "rg, git, curl", state: missing.length ? "fail" : "ok",
-    detail: missing.length ? `not found: ${missing.join(", ")}` : "found",
-    fix: "install ripgrep, git and curl (the agent-interactive package brings them)",
-  });
+  add("tools", missing.length ? "fail" : "ok", missing.length ? `not found: ${missing.join(", ")}` : "found",
+    "install ripgrep, git and curl (the agent-interactive package brings them)");
 
   if (o.attach) {
     try {
@@ -2921,44 +4709,35 @@ async function doctor(): Promise<never> {
       await r.body?.cancel();
       const v = await fetch(`${o.attach}/@vite/client`, { signal: AbortSignal.timeout(8000) });
       const vite = v.ok && (await v.text()).includes("wsToken");
-      add({
-        id: "page", title: "Page", state: vite ? "ok" : "warn",
-        detail: vite ? `${o.attach} is a Vite dev server with hot reload` : `${o.attach} answers (${r.status}) but serves no Vite client`,
-        fix: "changes still land in the files, but the page will not reload by itself: attach to its dev server",
-      });
+      add("page", vite ? "ok" : "warn", vite ? `${o.attach} is a Vite dev server with hot reload` : `${o.attach} answers (${r.status}) but serves no Vite client`,
+        "changes still land in the files, but the page will not reload by itself: attach to its dev server");
     } catch (e) {
-      add({ id: "page", title: "Page", state: "fail", detail: `${o.attach}: ${errText(e)}`, fix: "start the page's dev server, or check the URL" });
+      add("page", "fail", `${o.attach}: ${errText(e)}`, "start the page's dev server, or check the URL");
     }
   } else {
     let index = false;
     try {
       index = Deno.statSync(`${root}/index.html`).isFile;
     } catch { /* none */ }
-    add({
-      id: "page", title: "Page", state: index ? "ok" : "warn",
-      detail: index ? `${root}/index.html, served here with its own hot reload` : `no index.html in ${root}`,
-      fix: "pick the folder that holds the page, or the URL of the dev server that serves it",
-    });
+    add("page", index ? "ok" : "warn", index ? `${root}/index.html, served here with its own hot reload` : `no index.html in ${root}`,
+      "pick the folder that holds the page, or the URL of the dev server that serves it");
   }
 
   const fastCmd = o.opencodeCmd.split(/\s+/)[0];
   if (o.opencode) {
-    add({ id: "fast", title: "Fast lane", state: "skip", detail: `uses the opencode server at ${o.opencode}` });
+    add("fast", "skip", `uses the opencode server at ${o.opencode}`);
   } else if (!onPath(fastCmd)) {
-    add({
-      id: "fast", title: "Fast lane", state: "fail", detail: `'${fastCmd}' is not on PATH`,
-      fix: "install opencode (https://opencode.ai) and choose it as the fast lane's command",
-    });
+    add("fast", "fail", `'${fastCmd}' is not on PATH`, "install opencode (https://opencode.ai) and choose it as the fast lane's command");
   } else {
     const t = now();
     try {
       await within(opencode.start(), 60_000, `${fastCmd} serve`);
-      add({ id: "fast", title: "Fast lane", state: "ok", detail: `${o.flashModel} answered in ${((now() - t) / 1000).toFixed(1)} s` });
+      add("fast", "ok", `${o.flashModel} answered in ${((now() - t) / 1000).toFixed(1)} s`);
       const probe = `${root}/.agent-interactive-write-check`;
       const gone = () => Deno.remove(probe).catch(() => {});
       try {
-        let result: Check | undefined;
-        for (let attempt = 1; attempt <= 2 && !result?.state.match(/ok|fail/); attempt++) {
+        let result: [Check["state"], string] | undefined;
+        for (let attempt = 1; attempt <= 2 && !result?.[0].match(/ok|fail/); attempt++) {
           await gone();
           const sid = await opencode.next();
           await within(opencode.message(sid, `Use the write tool to create the file ${probe} containing the word ok. ` +
@@ -2968,36 +4747,27 @@ async function doctor(): Promise<never> {
           const denied = sandboxDenial(parts);
           const call = parts.find((p) => p.type === "tool" && EDIT_TOOLS.has(p.tool ?? ""));
           const why = call?.state?.error ? `: ${clip(call.state.error, 120)}` : call?.state?.input?.filePath !== probe && call ? ` (it wrote ${call.state?.input?.filePath})` : "";
-          result = {
-            id: "write", title: "Fast lane writes", state: wrote ? "ok" : denied ? "fail" : "warn",
-            detail: wrote ? `its sandbox may change files in ${root}` : denied ? cannotWrite(denied)
-              : call ? `its write did not land${why}${attempt === 1 ? "" : ", twice"}` : "the model did not try to write the check file",
-            fix: "choose a launcher whose sandbox may write the folder (on the fleet: opencode-bwrap)",
-          };
+          result = [wrote ? "ok" : denied ? "fail" : "warn", wrote ? `its sandbox may change files in ${root}` : denied ? cannotWrite(denied)
+            : call ? `its write did not land${why}${attempt === 1 ? "" : ", twice"}` : "the model did not try to write the check file"];
         }
-        add(result!);
+        add("write", ...result!, "choose a launcher whose sandbox may write the folder (with opencode-bwrap)");
       } catch (e) {
-        add({ id: "write", title: "Fast lane writes", state: "warn", detail: `could not check: ${clip(errText(e), 120)}` });
+        add("write", "warn", `could not check: ${clip(errText(e), 120)}`);
       } finally {
         await gone();
       }
     } catch (e) {
-      add({
-        id: "fast", title: "Fast lane", state: "fail", detail: `${o.flashModel}: ${clip(errText(e), 200)}`,
-        fix: `give ${o.flashModel.split("/")[0]} a key (the app keeps it in your keychain) or choose another model`,
-      });
+      add("fast", "fail", `${o.flashModel}: ${clip(errText(e), 200)}`,
+        `give ${o.flashModel.split("/")[0]} a key (the app keeps it in your keychain) or choose another model`);
     } finally {
       opencode.stop();
     }
   }
 
   if (!claude) {
-    add({ id: "claude", title: "Claude", state: "skip", detail: "off: every change stays on the fast lane" });
+    add("claude", "skip", "off: every change stays on the fast lane");
   } else if (!onPath(o.claudeCmd)) {
-    add({
-      id: "claude", title: "Claude", state: "fail", detail: `'${o.claudeCmd}' is not on PATH`,
-      fix: "install Claude Code (https://claude.com/claude-code), or turn the Claude agents off",
-    });
+    add("claude", "fail", `'${o.claudeCmd}' is not on PATH`, "install Claude Code (https://claude.com/claude-code), or turn the Claude agents off");
   } else {
     const v = await firstLine(o.claudeCmd, ["--version"]).catch(() => "");
     let auth: { loggedIn?: boolean; authMethod?: string; configDirectory?: string } = {};
@@ -3014,17 +4784,11 @@ async function doctor(): Promise<never> {
     } catch (e) {
       failed = errText(e);
     }
-    add({
-      id: "claude", title: "Claude", state: auth.loggedIn ? "ok" : "fail",
-      detail: auth.loggedIn ? `${v || o.claudeCmd}, logged in (${auth.authMethod ?? "account"})`
-        : failed ? `'${o.claudeCmd} auth status' failed in ${root}: ${clip(failed, 160)}` : `${v || o.claudeCmd}, not logged in`,
-      fix: failed ? `run '${o.claudeCmd} auth status' in ${root} to see why` : `log in with '${o.claudeCmd} auth login'`,
-    });
-    add({
-      id: "pty", title: "Agent terminals", state: onPath(PTY_CMD) ? "ok" : "fail",
-      detail: onPath(PTY_CMD) ? which(PTY_CMD) : `'${PTY_CMD}' is not on PATH`,
-      fix: "the agent-interactive package ships agent-pty; from a checkout: cd pty && cargo build --release",
-    });
+    add("claude", auth.loggedIn ? "ok" : "fail", auth.loggedIn ? `${v || o.claudeCmd}, logged in (${auth.authMethod ?? "account"})`
+      : failed ? `'${o.claudeCmd} auth status' failed in ${root}: ${clip(failed, 160)}` : `${v || o.claudeCmd}, not logged in`,
+      failed ? `run '${o.claudeCmd} auth status' in ${root} to see why` : `log in with '${o.claudeCmd} auth login'`);
+    add("pty", onPath(PTY_CMD) ? "ok" : "fail", onPath(PTY_CMD) ? which(PTY_CMD) : `'${PTY_CMD}' is not on PATH`,
+      "the agent-interactive package ships agent-pty; from a checkout: cd pty && cargo build --release");
     const home = Deno.env.get("HOME") ?? "";
     const configs = [auth.configDirectory && `${auth.configDirectory}/.config.json`, `${home}/.claude/.config.json`, `${home}/.claude.json`];
     const ancestors = root.split("/").map((_, i, parts) => parts.slice(0, i + 1).join("/") || "/");
@@ -3035,55 +4799,43 @@ async function doctor(): Promise<never> {
         trusted ||= ancestors.some((d) => projects[d]?.hasTrustDialogAccepted);
       } catch { /* not this one */ }
     }
-    add({
-      id: "trust", title: "Folder trust", state: trusted ? "ok" : "warn",
-      detail: trusted ? `Claude trusts ${root}` : `Claude has not been told to trust ${root}`,
-      fix: "the first agent asks once, with \"No, exit\" preselected: choose \"Yes, I trust this folder\" in its terminal",
-    });
+    add("trust", trusted ? "ok" : "warn", trusted ? `Claude trusts ${root}` : `Claude has not been told to trust ${root}`,
+      "the first agent asks once, with \"No, exit\" preselected: choose \"Yes, I trust this folder\" in its terminal");
   }
 
   if (!o.recgo) {
-    add({ id: "voice", title: "Voice", state: "skip", detail: "off: type instructions, or turn voice on to talk" });
+    add("voice", "skip", "off: type instructions, or turn voice on to talk");
   } else if (!onPath("recgo-tab")) {
-    add({ id: "voice", title: "Voice", state: "fail", detail: "recgo-tab is not on PATH", fix: "install recgo (programs.recgo on the fleet)" });
+    add("voice", "fail", "recgo-tab is not on PATH", "install recgo (programs.recgo on a NixOS host)");
   } else if (o.attach) {
     const port = o.recgoPort || 9222;
     try {
       const b = await (await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(3000) })).json();
-      add({ id: "voice", title: "Voice", state: "ok", detail: `recgo-tab will record ${b.Browser ?? "the browser"} on port ${port}` });
+      add("voice", "ok", `recgo-tab will record ${b.Browser ?? "the browser"} on port ${port}`);
     } catch {
-      add({
-        id: "voice", title: "Voice", state: "warn", detail: `no browser with remote debugging on port ${port}`,
-        fix: `start Chromium with --remote-debugging-port=${port} and open ${o.attach} in it`,
-      });
+      add("voice", "warn", `no browser with remote debugging on port ${port}`, `start Chromium with --remote-debugging-port=${port} and open ${o.attach} in it`);
     }
   } else {
-    add({ id: "voice", title: "Voice", state: "ok", detail: `recgo-tab launches its own browser on the page (port ${o.recgoPort || 9333})` });
+    add("voice", "ok", `recgo-tab launches its own browser on the page (port ${o.recgoPort || 9333})`);
   }
 
   if (o.say === "none") {
-    add({ id: "speech", title: "Spoken replies", state: "skip", detail: "off" });
-  } else if (o.say === "speaches") {
-    const player = onPath(PLAYER);
+    add("speech", "skip", "off");
+  } else if (o.say === "speaches" || o.say === "page") {
+    const player = o.say === "page" || onPath(PLAYER);
     try {
-      const r = await fetch(`${o.ttsUrl}/v1/models`, { signal: AbortSignal.timeout(6000) });
+      const r = await fetch(`${o.ttsUrl}/v1/models`, { headers: speechHeaders(), signal: AbortSignal.timeout(6000) });
       await r.body?.cancel();
-      add({
-        id: "speech", title: "Spoken replies", state: r.ok && player ? "ok" : "warn",
-        detail: r.ok ? (player ? `${o.ttsUrl} answers` : `${o.ttsUrl} answers, but ${PLAYER} is not on PATH`)
-          : `${o.ttsUrl} answered ${r.status}; replies are spoken with ${VOICE} meanwhile`,
-        fix: player ? `start the speech server at ${o.ttsUrl}, or point to another one` : `install ${PLAYER}`,
-      });
+      add("speech", r.ok && player ? "ok" : "warn", r.ok ? (player ? `${o.ttsUrl} answers` : `${o.ttsUrl} answers, but ${PLAYER} is not on PATH`)
+        : `${o.ttsUrl} answered ${r.status}; replies are spoken with ${VOICE} meanwhile`,
+        player ? `start the speech server at ${o.ttsUrl}, or point to another one` : `install ${PLAYER}`);
     } catch (e) {
-      add({
-        id: "speech", title: "Spoken replies", state: "warn",
-        detail: `${o.ttsUrl}: ${clip(errText(e), 100)}; replies are spoken with ${onPath(VOICE) ? VOICE : "nothing"} meanwhile`,
-        fix: "point to a speech server (OpenAI-compatible /v1/audio/speech), or turn spoken replies off",
-      });
+      add("speech", "warn", `${o.ttsUrl}: ${clip(errText(e), 100)}; replies are spoken with ${onPath(VOICE) ? VOICE : "nothing"} meanwhile`,
+        "point to a speech server (OpenAI-compatible /v1/audio/speech), or turn spoken replies off");
     }
   } else {
     const cmd = o.say.split(/\s+/)[0];
-    add({ id: "speech", title: "Spoken replies", state: onPath(cmd) ? "ok" : "fail", detail: onPath(cmd) ? `with ${cmd}` : `'${cmd}' is not on PATH` });
+    add("speech", onPath(cmd) ? "ok" : "fail", onPath(cmd) ? `with ${cmd}` : `'${cmd}' is not on PATH`);
   }
 
   const failed = checks.filter((c) => c.state === "fail").length;
@@ -3128,6 +4880,7 @@ if (o.attach) {
 } else {
   watch();
   say(`serving ${root} at ${pageUrl}`);
+  if (!inlineAll) say(`${root} is over the fast lane's 64 KB prompt: it gets the files around their words and the page on screen, and may grep and read`);
 }
 say(`log ${logPath}`);
 if (trajectoryPath) say(`trajectory ${trajectoryPath}`);
@@ -3144,6 +4897,6 @@ await opencode.start().catch((e) => {
 });
 say(`fast lane ${o.flashModel} ready on ${opencode.base} (a fresh session per change); large changes -> ${claude ? `${o.claudeWorkers} × ${o.claudeCmd} ${o.claudeModel}` : "the fast lane too"}`);
 if (claude) say(`claude agents ${[...terms.keys()].join(", ")}: each starts in its own terminal with its first change or when the app opens it`);
-say(`gate: ${o.gateUrl ? `${o.gateUrl}/v1/systemone (${o.gateModel})` : "keywords"}; speech: ${o.say}`);
+say(`gate: ${o.gateUrl ? `${o.gateUrl}${o.gateChat ? "/v1/chat/completions" : "/v1/systemone"} (${o.gateModel})` : "keywords"}; speech: ${o.say}`);
 if (o.recgo) startRecgo().catch((e) => say(`--recgo: ${errText(e)}`));
 readStdin();

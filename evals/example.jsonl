@@ -1,0 +1,8 @@
+// Synthetic cases showing the three suite shapes; real suites come from your own sessions (see README).
+{"id":"gate-small-01","said":["Turn the subscribe button red."],"expect":{"verdict":"small"}}
+{"id":"gate-large-01","said":["Find out why the events fail to load."],"expect":{"verdict":"large"}}
+{"id":"gate-none-01","said":["Okay, that looks fine."],"expect":{"verdict":"none"}}
+{"id":"gate-es-01","said":["Hacé el botón más grande"],"expect":{"verdict":"small"},"notes":"Spanish request"}
+{"id":"follow-01","prev":"Make the title twice as big","said":["Actually that's too big, shrink it a little"],"expect":{"follow":"append"}}
+{"id":"follow-02","prev":"Make the title twice as big","said":["Add a cancel button next to subscribe"],"expect":{"follow":"new"}}
+{"id":"target-demo-01","context":["00.00.01  Navigate: http://localhost:5199/"],"said":["make the title dark red"],"expect":{"verdict":"small","files":["style.css"]}}

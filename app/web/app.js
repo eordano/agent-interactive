@@ -17,6 +17,8 @@ let saved = {};
 let managed = {};
 let fleet = {};
 let settings = { ...DEFAULTS };
+let line = { start: false, given: null };
+let extras = { args: [], recgo: [] };
 let port = 0;
 let running = false;
 let selected = "";
@@ -32,17 +34,19 @@ function text(el, value) {
   return el;
 }
 
-function li(cls, first, second) {
-  const item = document.createElement("li");
-  if (cls) item.className = cls;
-  const a = document.createElement("div");
-  a.textContent = first;
-  item.append(a);
-  if (second) item.append(text(Object.assign(document.createElement("div"), { className: "line2" }), second));
-  return item;
+function make(tag, cls, value) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (value !== undefined) el.textContent = value;
+  return el;
 }
 
-/* ---------------- setup ---------------- */
+function li(cls, first, second) {
+  const item = make("li", cls);
+  item.append(make("div", "", first));
+  if (second) item.append(make("div", "line2", second));
+  return item;
+}
 
 function fillForm() {
   const f = $("#form");
@@ -95,22 +99,58 @@ function syncForm() {
   }).catch(() => {});
 }
 
+const CLI_FLAG = {
+  port: "--port", opencode: "--opencode", flashBudget: "--flash-budget", claudeCmd: "--claude-cmd", recgoPort: "--recgo-port",
+  gateUrl: "--gate-url", gateModel: "--gate-model", say: "--say", ttsVoice: "--tts-voice", ttsSpeed: "--tts-speed",
+  settle: "--settle", log: "--log", trajectories: "--trajectories",
+};
+const CLI_SWITCH = { followUp: "--no-follow-up", toast: "--no-toast" };
+
+function fromCli(g) {
+  const s = {
+    ...DEFAULTS, dir: g.dir, attach: Boolean(g.attach), url: g.attach ?? "", search: g.search ?? "",
+    flashModel: g.flashModel ?? DEFAULTS.flashModel, opencodeCmd: g.opencodeCmd ?? "opencode-bwrap",
+    claudeWorkers: g.claudeCmd === "none" ? 0 : g.claudeWorkers ?? DEFAULTS.claudeWorkers,
+    claudeModel: g.claudeModel ?? DEFAULTS.claudeModel, claudeEffort: g.claudeEffort ?? "",
+    voice: Boolean(g.recgo), browserPort: g.recgoPort ?? DEFAULTS.browserPort, sttBackend: effective().sttBackend,
+    speech: g.say !== "none", ttsUrl: g.ttsUrl ?? "http://127.0.0.1:8000",
+  };
+  const taken = new Set(["dir", "attach", "search", "flashModel", "opencodeCmd", "claudeWorkers", "claudeModel", "claudeEffort", "recgo", "ttsUrl", "recgoArgs"]);
+  if (g.claudeCmd === "none") taken.add("claudeCmd");
+  if (g.say === "none" || g.say === "speaches") taken.add("say");
+  if (s.attach) taken.add("recgoPort");
+  extras = { args: [], recgo: [] };
+  for (const [k, v] of Object.entries(g)) {
+    if (taken.has(k)) continue;
+    if (k in CLI_SWITCH) extras.args.push(CLI_SWITCH[k]);
+    else if (k in CLI_FLAG) extras.args.push(CLI_FLAG[k], String(v));
+  }
+  const recgo = [...(g.recgoArgs ?? [])];
+  const at = recgo.indexOf("--stt-backend");
+  if (at >= 0 && recgo[at + 1]) s.sttBackend = recgo.splice(at, 2)[1];
+  extras.recgo = recgo;
+  return s;
+}
+
 function argsFor(s, port) {
   const a = [s.dir];
   if (port) a.push("--port", String(port));
   if (s.attach && s.url) a.push("--attach", s.url);
   if (s.search.trim()) a.push("--search", s.search.replace(/\s+/g, ""));
   a.push("--flash-model", s.flashModel, "--opencode-cmd", s.opencodeCmd);
-  if (s.claudeWorkers > 0) a.push("--claude-workers", String(s.claudeWorkers), "--claude-model", s.claudeModel);
-  if (s.claudeWorkers > 0 && s.claudeEffort) a.push("--claude-effort", s.claudeEffort);
-  else a.push("--claude-cmd", "none");
+  if (s.claudeWorkers > 0) {
+    a.push("--claude-workers", String(s.claudeWorkers), "--claude-model", s.claudeModel);
+    if (s.claudeEffort) a.push("--claude-effort", s.claudeEffort);
+  } else a.push("--claude-cmd", "none");
   if (s.voice) {
     a.push("--recgo");
     if (s.attach && s.browserPort) a.push("--recgo-port", String(s.browserPort));
   }
   if (s.speech && s.ttsUrl) a.push("--say", "speaches", "--tts-url", s.ttsUrl);
   else a.push("--say", "none");
-  if (s.voice && s.sttBackend) a.push("--", "--stt-backend", s.sttBackend);
+  a.push(...extras.args);
+  const recgo = [...(s.voice && s.sttBackend ? ["--stt-backend", s.sttBackend] : []), ...extras.recgo];
+  if (recgo.length) a.push("--", ...recgo);
   return a;
 }
 
@@ -152,14 +192,9 @@ function renderChecks(checks) {
   ol.replaceChildren();
   const mark = { ok: "✓", warn: "!", fail: "✗", skip: "–" };
   for (const c of checks) {
-    const item = document.createElement("li");
-    item.className = c.state;
-    item.append(
-      text(Object.assign(document.createElement("span"), { className: "mark" }), mark[c.state]),
-      text(document.createElement("b"), c.title),
-      text(document.createElement("span"), c.detail),
-    );
-    if (c.fix && c.state !== "ok" && c.state !== "skip") item.append(text(Object.assign(document.createElement("span"), { className: "fix" }), c.fix));
+    const item = make("li", c.state);
+    item.append(make("span", "mark", mark[c.state]), make("b", "", c.title), make("span", "", c.detail));
+    if (c.fix && c.state !== "ok" && c.state !== "skip") item.append(make("span", "fix", c.fix));
     ol.append(item);
   }
   $("#checks-section").hidden = false;
@@ -172,14 +207,12 @@ async function persist() {
   await invoke("settings_save", { settings: own });
 }
 
-/* ---------------- session ---------------- */
-
 async function start(ev) {
   ev.preventDefault();
   settings = { ...readForm(), ...managed };
   if (problem(settings)) return check();
   await persist();
-  const suggested = await invoke("free_port");
+  const suggested = extras.args.includes("--port") ? 0 : await invoke("free_port");
   port = 0;
   logLines.length = 0;
   text($("#log"), "");
@@ -230,6 +263,7 @@ function renderRun() {
   if (s.viteUp !== null) parts.push(s.viteUp ? "Hot reload connected" : "Hot reload not connected");
   if (s.recgo !== null) parts.push(s.recgo ? "Recording the tab" : "Voice not running");
   parts.push(s.muted ? "Muted" : s.recgo ? "Listening" : "Type changes below");
+  if (s.heard && s.now - s.heard.at < 15_000) parts.push(`Heard "${s.heard.text.length > 60 ? s.heard.text.slice(0, 59) + "…" : s.heard.text}": ${s.heard.outcome}`);
   if (s.speechError) parts.push("Speech server failing, using the system voice");
   text($("#run-state"), parts.join(" · "));
   const mute = $("#mute");
@@ -243,10 +277,9 @@ function renderRun() {
     let item = rows.get(w.name);
     rows.delete(w.name);
     if (!item) {
-      item = document.createElement("li");
+      item = make("li");
       item.dataset.name = w.name;
-      item.append(document.createElement("div"), Object.assign(document.createElement("span"), { className: "state" }),
-        Object.assign(document.createElement("div"), { className: "line2" }));
+      item.append(make("div"), make("span", "state"), make("div", "line2"));
       item.onclick = () => select(w.name);
       agents.append(item);
     }
@@ -299,8 +332,6 @@ function renderView() {
   else showLog(w.name);
 }
 
-/* ---------------- terminals and logs ---------------- */
-
 const terms = new Map();
 let look = {};
 let ghosttyReady;
@@ -313,8 +344,7 @@ function themeFrom(l) {
     if (p[i]) theme[n] = p[i];
     if (p[i + 8]) theme[`bright${n[0].toUpperCase()}${n.slice(1)}`] = p[i + 8];
   });
-  if (l.background) theme.background = l.background.startsWith("#") ? l.background : `#${l.background}`;
-  if (l.foreground) theme.foreground = l.foreground.startsWith("#") ? l.foreground : `#${l.foreground}`;
+  for (const k of ["background", "foreground"]) if (l[k]) theme[k] = l[k].startsWith("#") ? l[k] : `#${l[k]}`;
   if (l["cursor-color"]) theme.cursor = l["cursor-color"];
   if (l["selection-background"]) theme.selectionBackground = l["selection-background"];
   return theme;
@@ -326,7 +356,7 @@ async function showTerm(name) {
     ghosttyReady ??= init();
     await ghosttyReady;
     if (terms.has(name)) return;
-    const el = Object.assign(document.createElement("div"), { className: "term" });
+    const el = make("div", "term");
     el.dataset.agent = name;
     $("#view-body").append(el);
     const term = new Terminal({
@@ -371,7 +401,7 @@ const logs = new Map();
 async function showLog(name) {
   let l = logs.get(name);
   if (!l) {
-    const el = Object.assign(document.createElement("pre"), { className: "agent-log" });
+    const el = make("pre", "agent-log");
     el.dataset.agent = name;
     $("#view-body").append(el);
     l = { el, after: 0, busy: false };
@@ -387,17 +417,15 @@ async function showLog(name) {
       const cls = line.text.startsWith("▶") ? "change" : line.text.startsWith("■") ? (/failed/.test(line.text) ? "failed" : "done")
         : line.text.startsWith("→") ? "tool" : "";
       const time = new Date(line.t).toTimeString().slice(0, 8);
-      l.el.append(text(Object.assign(document.createElement("div"), { className: cls }), `${time}  ${line.text}`));
+      l.el.append(make("div", cls, `${time}  ${line.text}`));
     }
     l.after = r.next;
-    if (!l.el.children.length) l.el.append(text(Object.assign(document.createElement("div"), { className: "tool" }), "No change yet: small changes appear here as the fast lane works on them."));
+    if (!l.el.children.length) l.el.append(make("div", "tool", "No change yet: small changes appear here as the fast lane works on them."));
     if (stick) l.el.scrollTop = l.el.scrollHeight;
   } catch { /* the loop is busy starting */ } finally {
     l.busy = false;
   }
 }
-
-/* ---------------- wiring ---------------- */
 
 async function stopSession() {
   $("#stop").disabled = true;
@@ -430,9 +458,13 @@ async function main() {
   const known = (o) => Object.fromEntries(Object.entries(o ?? {}).filter(([k]) => FIELDS.includes(k)));
   managed = known(r.managed);
   fleet = known(r.defaults);
-  settings = effective();
+  line = await invoke("cli_line");
+  settings = line.given ? { ...fromCli(line.given), ...managed } : effective();
   look = await invoke("ghostty_look").catch(() => ({}));
   fillForm();
+  const carried = [...extras.args, ...(extras.recgo.length ? ["--", ...extras.recgo] : [])];
+  $("#cli-note").hidden = !carried.length;
+  text($("#cli-note"), carried.length ? `Also from the command line, for this launch only: ${carried.join(" ")}` : "");
   $("#setup").hidden = false;
 
   const f = $("#form");
@@ -511,7 +543,7 @@ async function main() {
     const last = logLines.slice(-3).join(" / ");
     backToSetup(code === null || code === 0 || code === 130 ? undefined : `The session ended (exit ${code}). Its last words: ${last}`);
   });
-  if (await invoke("start_requested")) {
+  if (line.start) {
     await check();
     if (!$("#start").disabled) $("#form").requestSubmit();
   }

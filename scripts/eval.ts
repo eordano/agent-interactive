@@ -93,15 +93,16 @@ const lane = (v?: string) => (v === "small" || v === "large" ? "request" : "none
 const secs = (ms?: number | null) => (ms == null ? "-" : `${(ms / 1000).toFixed(1)}s`);
 const same = (a: string, b: string) => a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`);
 const results: Result[] = [];
+const skip = (c: Case, why: string) => results.push({ id: c.id, expected: c.expect, skipped: why });
+const post = (path: string, body: unknown, ms: number) =>
+  fetch(`${B}/${path}`, { method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(ms), body: JSON.stringify(body) })
+    .then((x) => x.json()).catch((e) => ({ error: String(e) }));
 
 for (const c of cases) {
   if (c.prev !== undefined) {
-    const r = await fetch(`${B}/relation`, {
-      method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(10_000),
-      body: JSON.stringify({ prev: c.prev, said: c.said.join(" "), running: c.running }),
-    }).then((x) => x.json()).catch((e) => ({ error: String(e) }));
+    const r = await post("relation", { prev: c.prev, said: c.said.join(" "), running: c.running }, 10_000);
     if (r.error || !r.verdict) {
-      results.push({ id: c.id, expected: c.expect, skipped: `relation failed: ${r.error ?? "no verdict"}` });
+      skip(c, `relation failed: ${r.error ?? "no verdict"}`);
       continue;
     }
     const res: Result = { id: c.id, expected: c.expect, relation: r.verdict, follow: r.verdict === c.expect.follow, ms: r.ms };
@@ -111,15 +112,12 @@ for (const c of cases) {
   }
   const dry = !gateOnly && Boolean(c.expect.files?.length);
   if (dry && c.attach && !page.startsWith(c.attach)) {
-    results.push({ id: c.id, expected: c.expect, skipped: `needs a loop attached to ${c.attach}` });
+    skip(c, `needs a loop attached to ${c.attach}`);
     continue;
   }
-  const r = await fetch(`${B}/replay${dry ? "" : "?gate=1"}`, {
-    method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(180_000),
-    body: JSON.stringify({ context: c.context ?? [], screen: c.screen ?? [], said: c.said }),
-  }).then((x) => x.json()).catch((e) => ({ error: String(e) }));
+  const r = await post(`replay${dry ? "" : "?gate=1"}`, { context: c.context ?? [], screen: c.screen ?? [], said: c.said }, 180_000);
   if (r.error) {
-    results.push({ id: c.id, expected: c.expect, skipped: `replay failed: ${r.error}` });
+    skip(c, `replay failed: ${r.error}`);
     continue;
   }
   const verdict = r.gates?.at(-1)?.verdict as string | undefined;

@@ -1,7 +1,7 @@
 [package]
 name = "agent-interactive-app"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Say a change to a web page and watch the agents make it"
 license = "MIT"
 
@@ -17,7 +17,7 @@ tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-keyring = { version = "3", features = ["apple-native", "sync-secret-service", "crypto-rust"] }
+keyring = "4"
 
 [profile.release]
 opt-level = "s"

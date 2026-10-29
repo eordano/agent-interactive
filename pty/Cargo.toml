@@ -1,7 +1,7 @@
 [package]
 name = "agent-pty"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Run one command in a pseudo-terminal: its output on stdout, input and resizes as frames on stdin"
 license = "MIT"
 

@@ -9,9 +9,12 @@ said is a change request, two agent lanes, and a timing record for every instruc
 ./agent-interactive.ts demo --recgo -- --stt-backend realtime   # speak them
 curl -X POST 'localhost:5199/__ai/say?wait=1' --data 'make the title dark red'
 
-# dcl.one while the umbrella is in dev mode: edit its working tree, talk while you browse
-./agent-interactive.ts ~/dcl-one --attach https://dcl.one \
-    --search sites/src,ui3/src --recgo -- --stt-backend realtime
+# a site its own Vite dev server serves: edit its working tree, talk while you browse
+./agent-interactive.ts ~/src/site --attach http://localhost:5173 \
+    --search src --recgo -- --stt-backend realtime
+
+# a folder of reveal.js decks: open one at localhost:5199/<deck>.html and talk over it
+./agent-interactive.ts ~/talks --recgo -- --stt-backend realtime
 ```
 
 Open `http://localhost:5199/` (with `--recgo`, recgo-tab opens it for you). `--help` has every
@@ -20,10 +23,9 @@ option; a mistyped one is answered with the nearest real one.
 ## `--attach`: a page a Vite dev server already serves
 
 With `--attach URL` nothing is served. The loop reads the token from `URL/@vite/client`, opens
-the page's own HMR socket (`wss://dcl.one/?token=…`, subprotocol `vite-hmr`) and stamps each
+the page's own HMR socket (`wss://<page host>/?token=…`, subprotocol `vite-hmr`) and stamps each
 `update`, `full-reload` and build `error` frame onto the running change. A build error is what
-gets spoken. DIR is edited in place; when it is an NFS export with `all_squash`, as dcl.one's tree
-is, every write lands owned by the export's anonymous user and the Vite on the exporting machine
+gets spoken. DIR is edited in place; when it is an NFS export with `all_squash`, every write lands owned by the export's anonymous user and the Vite on the exporting machine
 sees it through inotify. With `--recgo`, recgo-tab attaches to the open tab whose URL matches
 (`--match`, the desktop browser's CDP port 9222) instead of launching one.
 
@@ -31,7 +33,7 @@ A real app cannot be inlined into the prompt, so the fast lane runs with grep an
 glob or list) and the loop does the first lookup itself, natively under `--search` (see
 [What the fast lane is given](#what-the-fast-lane-is-given)).
 
-| on dcl.one's tree, over NFS | cost |
+| on a large app tree, over NFS | cost |
 | --- | --- |
 | glob inside the gVisor (runsc) sandbox | 93 s for one pattern |
 | the same glob natively / inside bubblewrap | 41 ms / 21–24 s |
@@ -41,7 +43,114 @@ glob or list) and the loop does the first lookup itself, natively under `--searc
 | "change the top bar colour", flash finding it with grep | 6.0 s, 7 tool calls |
 
 That table is why the default launcher is `opencode-bwrap`, why glob is off, and why the fast
-lane asks for its model per message (`--flash-model`) instead of relying on a wrapper.
+lane names its model on every session it creates (`--flash-model`) instead of relying on a wrapper.
+
+## Behind a proxy: the page carries its own ears and eyes
+
+A page served to people who have neither recgo nor a CDP browser gets the loop's client from
+`GET /__ai/client.js` (a proxy injects the tag; the app's tree carries nothing) and talks to the
+loop over the same `/__hmr` socket a served page uses, through the proxy under the page's own
+name. `--origin URL` admits that name; the loop still insists on its own Host, so the proxy
+keeps `127.0.0.1:PORT` on the `/__ai/` and `/__hmr` paths. What recgo used to see, the client
+reports itself: every click as a recgo-shaped `Click:` line (element, ids, classes, `data-testid`,
+label), every pushState or hash navigation as the page, and the screen text on request (the loop
+asks over the socket when it looks up a change; 1.5 s budget, then it goes without). With
+`--stt-url` the client shows a Talk button: the microphone goes as PCM16 at 24 kHz over
+`WS /__ai/mic`, the loop relays it to the speech server's `/v1/realtime` socket (server VAD,
+900 ms of silence ends an utterance, as recgo's realtime lane; with the page's own detector on,
+turns end the moment it hears speech stop: TEN VAD in WASM at 16 kHz with 16 ms hops, 320 ms of
+quiet below 0.35 after speech above 0.5, Silero VAD v5 when the browser cannot run the worklet,
+both served from this host under `/__ai/vad/`) and feeds partials and completed
+utterances into the same hearing and narration path, so settling, muting and follow-ups work
+unchanged. `--say page` plays the speaches audio in the page (binary frames on the socket); when
+the server fails the page speaks the sentence with its own voice.
+
+The speech server can be a public API: `--speech-key-file F` sends the key as a bearer on
+`/v1/audio/speech` and as the `openai-insecure-api-key` subprotocol on the realtime socket (the
+only way a WebSocket can carry a credential), `--tts-model` names the speech model (`kokoro` for
+speaches, `gpt-4o-mini-tts` for OpenAI) and `--stt-model` switches the realtime session to
+OpenAI's shape (`session.type: transcription`, `audio.input.format audio/pcm 24000`, the model
+under `transcription`). Deno's `fetch` and `WebSocket` both honour `HTTPS_PROXY`, so the loop
+runs unchanged behind an allowlist proxy.
+
+A shared deployment puts the loop behind a reverse proxy that does TLS, basic auth and the
+injection, with an allowlist proxy (the model APIs and the package registries the dev build needs)
+as the box's only way out.
+
+## The widget: talk, review, pull request
+
+`--widget` serves `widget.js` after the page client (the client leaves a bridge at `window.__ai`):
+a dot in the corner whose colour is the state (grey signed out, green listening, orange working,
+ruby when something needs you), a pill on hover with the live words and how many requests run,
+and on click the list of changes with the running ones nearest the dot. A change opens as a ghost
+terminal while it runs (the tool calls from the fast lane's trace) and as "you said / what
+happened" afterwards, with a timeline built from the job's own timestamps, the diff
+(`git diff HEAD` on the job's files) and Revert (files back to the last commit; other edits to the
+same files go with them). Review maximises: pick finished changes, see each diff, Create Pull
+Request drafts a title and description from what was said, and the loop does the rest on the
+server, streamed as the same kind of terminal: a worktree branch from HEAD, one commit per
+change (the job's files copied over), push to `--forge-url`'s `--forge-repo` with
+`--forge-token-file` (the repository is created on the first pull request, and `main` pushed
+first when it is empty), the pull request opened through Forgejo's API (`WIP:` when it is a
+draft), and the items carry the PR number afterwards. A pull request carries only its sender's
+own changes, and it is theirs on Forgejo too: with `--forge-admin-token-file` (an admin token,
+`write:admin` and `write:user`) the loop finds the Forgejo account behind the Decentraland login
+by its synthetic email (`<address>@users.noreply.invalid` unless `--forge-email-domain` says otherwise), makes it on the spot
+when there is none (the profile's name as username, its face as avatar, its description, a
+marketplace link; nobody signs in to Forgejo by hand, the site's login is the credential), commits
+in that account's name and email, and opens the pull request with the `Sudo` header. Without the
+admin token the bot user of `--forge-token-file` opens it.
+
+The smart lane is Claude or Codex (`--smart`, changed live from the widget's Models view with the
+fast lane model, the Claude model and effort, the Codex model and the speech models; `/__ai/settings`
+persists them to `--settings-file`). Codex runs as `codex exec --json` per request, its command and
+file-change items read as the trace. Behind a basic-auth curtain the widget's login travels in
+`x-ai-token` (Authorization belongs to the curtain) and the proxy must let websocket upgrades
+through unauthenticated, since browsers never attach cached basic-auth credentials to a handshake.
+
+Who asked: when the page is a Decentraland site, the widget reads the Decentraland identity the site
+keeps in `localStorage` (`dcl:auth:identity:v1`), signs this loop's challenge with the ephemeral
+key in the browser and posts the chain; the loop verifies it the way the protocol describes
+(`/__ai/challenge`, `/__ai/login`) and looks the name up on the catalyst. Nothing to sign for the
+person, and the key never leaves the page; the widget shows no address anywhere, only the name
+when the catalyst has one. Routes: `/__ai/changes`, `/__ai/changes/:id` (`/revert`, `/stop`),
+`/__ai/me` (the name and the Forgejo account), `/__ai/pr`, `/__ai/status` (what the hover pill
+shows: who works on what, the queue, the microphone). The widget follows the "Agent Widget ·
+Flow v1" frames: the dot, the hover pill, the A1 card on first open (a Status chip with both
+logins as two dots, the listening row with the Mute/Listen button), the B3 stack of pills, the
+B4 ghost terminal, the B5 history card, the C1 review and C2 compose windows, the C3 sending
+terminal and the C4 opened card. Three hooks drive it from an automated check:
+`window.__aiWidgetDo(selector)` clicks inside the widget, `__aiWidgetText(selector)` reads it,
+`__aiWidgetView()` tells the open view.
+
+## A folder it serves, and reveal.js decks
+
+Without `--attach` the loop serves DIR itself and injects a small client into every HTML page.
+When DIR's editable files fit in 64 KB (a demo page), all of them go into the fast lane's prompt
+and its read and search tools stay off. A larger folder gets what `--attach` gets: the files the
+lookup below finds, plus grep and read. The page reports its URL to the loop, so the current page
+is known without recgo: a static page's own file and its stylesheets (not those under `dist/`) are
+its files. A page the change before edited is left out unless it is the current one: in a folder
+of decks it is another talk.
+
+On a reveal.js deck the client also reports the slide on screen (its first heading, else its
+text). The loop finds that heading in the deck and puts the 80 lines around it first in the prompt,
+so "make this heading say…" needs no quote and no search. An HTML update replaces only the
+`<section>`s whose source changed, re-runs the highlight plugin on them, then calls
+`Reveal.sync()` and returns to the same slide; head styles are swapped as on any page. Replacing
+the body, as for any other page, left the deck blank (0 of 4 slides visible, 2026-10-04): the
+new markup has no Reveal state and parsed scripts never run. The page reloads instead (the deck's
+`hash: true` keeps the slide) when the scripts changed, when a changed section holds an element an
+inline script looks up by id, or when a section uses `data-markdown`.
+
+| on a folder of decks (1.4 MB) | before | after |
+| --- | --- | --- |
+| "make this heading say …" on a 107 KB deck | "can't be found", 12.7 s, no edit | 1.8 s, one edit, 6.3 KB prompt |
+| "make the text on this slide a bit smaller" | the deck blanks on the update | 1.7 s, the slide's rule, in place |
+| a text edit on a scripted grid slide | blank | reload onto the same slide, 883 cells |
+
+Phrases are matched across inline markup: "worth coming back" finds `Worth<br>coming<br>back`.
+Decks written by a build script are overwritten on their next build; talk over the hand-written ones.
 
 ## The app
 
@@ -64,8 +173,15 @@ no npm lockfile) that starts this loop and shows it:
   fast lane shows its log. The box at the bottom sends a change (`!` for Claude); Mute, Loop output
   and Stop session sit in the top bar; Ctrl+1..9 pick an agent, Ctrl+K the box.
 
-`agent-interactive-app --start` checks the saved settings and starts the session at once when nothing
-fails (a shortcut, or a restart that should not wait for a click).
+The app takes the loop's own arguments: `agent-interactive-app ~/src/site --attach http://localhost:5173
+--search src --recgo -- --stt-backend realtime` opens the form filled from that line
+(`agent-interactive parse` gives the app the loop's parse, so the validation, the defaults and the
+did-you-mean are the loop's; values pinned by the machine still win). An option the form has no
+field for (`--settle`, `--no-toast`, a recgo-tab flag) goes to the session as given, listed under the
+form, for that launch only. `--start` checks the form and starts the session at once when nothing
+fails (a shortcut, or a restart that should not wait for a click), with the saved settings when
+nothing else is on the line. `agent-interactive-app doctor ...` and `--help` are the loop's, the
+former with the keys the app keeps in the keychain.
 
 The webview's origin is `tauri://localhost`, so the loop answers CORS preflights and adds
 `Access-Control-Allow-Origin` for the app's origins only.
@@ -106,17 +222,15 @@ until it ends. The first time Claude opens a folder it asks whether to trust it,
 preselected: until someone answers in its terminal no session starts, and the loop says the
 agent needs you. On 2026-09-29 a test's Enter chose "No, exit".
 
-The tmux layout, the `dashboard` and `watch` commands and the headless stream-json sessions are
-gone; the app replaces them. Without it: `GET /__ai/status` (every agent, the queue, recent
+The app replaced the tmux layout, the `dashboard` and `watch` commands and the headless stream-json
+sessions. Without it: `GET /__ai/status` (every agent, the queue, recent
 results), `GET /__ai/worker?name=AGENT` (an agent's log) and the terminal socket above.
 
 ## Muting
 
-Say "mute", "stop listening" or "silencio" (alone, as the whole utterance), use the app's mute
-button, type `:mute` in the loop or `POST /__ai/mute`, and narration stops being acted on:
-recgo keeps recording, the loop drops what it was holding and logs every line as "muted, not acted
-on". "unmute", "start listening" or "escuchá", the button, `:unmute` or `POST /__ai/mute?on=0` bring it
-back. On 2026-09-29 side talk in Spanish was held and merged into the next request, and a
+Muting (the words, `:mute`, the app's button or `POST /__ai/mute` in `--help`; `?on=0` unmutes)
+stops narration being acted on: recgo keeps recording, the loop drops what it was holding and logs
+every line as "muted, not acted on". On 2026-09-29 side talk in Spanish was held and merged into the next request, and a
 question meant for someone else in the room rode into a Claude change.
 
 ## What the gate lets through
@@ -124,7 +238,11 @@ question meant for someone else in the room rode into a Claude change.
 English and Spanish ("cambiá", "sacá", "poné", "hacé", "arreglá", "más grande", "fijate por qué", "no
 carga", "tarda") both count as requests; performance complaints ("takes too long to load",
 "improve the performance", "tarda mucho") go to Claude, while speed words about a UI element ("make
-the fade faster") stay a small change. Three kinds of utterance are dropped, not held:
+the fade faster") stay a small change. Whatever is heard and not acted on (no change asked, muted,
+about the tool) shows for a moment in the page's status bubble and the app's status line, as
+`Heard "…": no change asked, nothing done`. On 2026-10-05 two sessions of "Okay, this looks okay"
+were held silently, and from the outside voice looked dead. Three kinds of utterance are dropped,
+not held:
 
 - a cancellation, when it is short and on its own ("never mind", "cancel that", "don't change it",
   "dejalo", "olvidate"): it drops what is being held, or cancels the latest change: taken out of
@@ -154,6 +272,7 @@ round trip. So before a change is queued the loop gathers, natively and in about
    `Click:` lines);
 2. the files where the instruction's phrases occur, searched in tiers (quotes and three-word
    phrases, then pairs, then long single words) so a weak word never crowds out a strong one.
+   Words may be split by tags, `<br>` or `&nbsp;`.
    Hits on the current page, or where the phrase stands as text in a string or JSX, count as
    likely; hits in comments elsewhere contribute their lines only;
 3. the files the change just before edited;
@@ -169,14 +288,14 @@ collapsed into counts, go to Claude, where diagnosis happens. A navigation that 
 query or hash is not a new page; a new page resets the clicks and errors.
 
 While a change runs the loop polls its tool calls. A grep or glob that starts outside `--search`
-is stopped and the same session is told, once, to stay inside it; a whole-tree grep on dcl.one's
+is stopped and the same session is told, once, to stay inside it; a whole-tree grep on a large
 NFS tree took 16-55 s, which the 20 s budget would otherwise have spent.
 
 A file is sent whole below 24 KB, otherwise as a window of 80 lines around each hit, within 64 KB
 in all. More context is not free: a 64 KB prompt of the wrong files turned a 3.5 s change into
 10 s, because every round trip re-reads it.
 
-Dry runs on dcl.one (editing switched off, same model; the cases now live in `evals/dcl-one.jsonl`):
+Dry runs on a production site's tree (editing switched off, same model):
 
 | request | matching lines only | with the relevant files |
 | --- | --- | --- |
@@ -188,15 +307,14 @@ Dry runs on dcl.one (editing switched off, same model; the cases now live in `ev
 
 ## Agents and scheduling
 
-The fast lane is one agent. Every change runs in a new opencode session, taken from a spare
-that was created and warmed while the previous change ran, so a session never accumulates
-context and the switch costs nothing. The last four changes (what was said, the summary, the
-files) ride along in its prompt, which is what keeps "no, the other way" working.
+The fast lane is one agent that runs every change in a fresh session, taken from a spare warmed
+while the previous change ran ([why](#why-each-lane-is-shaped-the-way-it-is)). The last four
+changes (what was said, the summary, the files) ride along in its prompt, which is what keeps
+"no, the other way" working.
 
-The large-change lane is `--claude-workers` agents (default 4), each an interactive Claude in its
-own terminal (above). Each change carries a footprint: the files
+The large-change lane is the Claude agents [above](#claude-agents-run-in-terminals). Each change carries a footprint: the files
 its hints point at, found before it is queued. A change starts only when no running change in
-its lane shares a file with it and none has an unknown footprint. Across the two lanes nothing waits: the fast lane runs beside Claude even on a file Claude has
+its lane shares a file with it; in the fast lane, an unknown footprint on either side also holds it. Across the two lanes nothing waits: the fast lane runs beside Claude even on a file Claude has
 already edited, and the loop says so ("#5 runs beside #3: claude-2 is also editing
 ItemPreview.tsx"). Both edit tools check a file's current text before writing, so neither loses
 the other's change; a guessed overlap used to hold fast changes for minutes (2026-09-29: behind a
@@ -236,8 +354,8 @@ changes; a change with no recorded edits now takes the files named by the HMR up
 | gate | narration only. Keywords by default: a change word, a complaint ("doesn't", "seems off", "missing", "can we") or a request to diagnose passes, approval and chatter are held as context for 30 s. Diagnosis ("figure out why", "error", "loading", "broken", "check that", "not loaded", "correctly downloaded"), a question of five words or more with no change word in it, and anything naming Claude go to the large lane directly. `--gate-url` asks `POST /v1/systemone` one `choice` question (small / large / incomplete / none) over the last 30 s of what was said instead; `incomplete` keeps listening and joins the next line, `none` clears the buffer. A gate failure falls back to keywords for the rest of the run. |
 | settle | recgo narration only (`--settle MS`, default 1000). A request is sent once nothing has been heard for 1 s, counting recgo's `hearing:` partials of the next utterance, and up to 5 s longer while it ends mid-sentence ("…so that we can"); whatever was said by then is one request, judged large if any part was. It adds about a second to every spoken change. |
 | follow | `--no-follow-up` switches it off. Is the request part of the last change? See [Agents and scheduling](#agents-and-scheduling). |
-| route | small changes go to the fast lane (`opencode-bwrap serve`, the model chosen per message with `--flash-model`, Cerebras qwen-3.8-27b). It may answer `ESCALATE:`, or reach nothing within `--flash-budget` seconds (then it is aborted); either way the change moves to the large lane. A leading `!`, a `large` verdict, or narration that names Claude goes straight there. A change whose HMR brings a build error is followed at once by a repair change carrying the error, once. |
-| apply | the file watcher attributes each write to the running job and pushes a Vite-shaped frame over `/__hmr`: CSS swaps the stylesheet, HTML replaces head styles and body in place, anything else reloads. recgo-tab classifies these frames as `HMR: vite update /style.css`. |
+| route | small changes go to the fast lane (`opencode-bwrap serve`, the model chosen per session with `--flash-model`, Cerebras qwen-3.8-27b). It may answer `ESCALATE:`, or reach nothing within `--flash-budget` seconds (then it is aborted); either way the change moves to the large lane. A leading `!`, a `large` verdict, or narration that names Claude goes straight there. A change whose HMR brings a build error is followed at once by a repair change carrying the error, once. |
+| apply | the file watcher attributes each write to the running job and pushes a Vite-shaped frame over `/__hmr`: CSS swaps the stylesheet, HTML replaces head styles and body in place (on a reveal.js deck, the changed slides), anything else reloads. recgo-tab classifies these frames as `HMR: vite update /style.css`. |
 | confirm | the page acknowledges after two animation frames (painted), or at once when the tab is hidden (applied, not painted). A status pill in the page says what is happening. |
 | speak | the agent's closing "I …" sentence (markdown stripped), clipped to 100 characters, is synthesized by speaches (`POST --tts-url/v1/audio/speech`, kokoro, voice `af_heart`, speed 2.0) and played with `pw-play`, one at a time. `--say none` for quiet, `--say CMD` for any other speaker. Synthesis of a 58-character sentence took 0.24–0.65 s. While speaches fails, summaries go to `spd-say` and the failure is logged once. |
 
@@ -247,17 +365,19 @@ paint, agent done and spoken. `GET /__ai/jobs` returns the last 20.
 
 ## Why each lane is shaped the way it is
 
-- **The flash prompt carries the files.** Every project file under 64 KB total is inlined, and
-  read/search/shell/question tools are switched off per message, so the model's first action is
-  the edit. With them on, it spends two extra round trips on Glob and Read.
-- **A fresh flash session per change.** On dcl.one one session grew from 13k to 79k tokens over
+- **The flash prompt carries the files.** When the whole project is under 64 KB, every file is
+  inlined and read/search/shell/question tools are switched off per message (opencode 2.x: the session's
+  permission rules, rewritten before each prompt), so the model's first
+  action is the edit. With them on, it spends two extra round trips on Glob and Read. A larger
+  project cannot be inlined: it gets the lookup's files and grep and read, as with `--attach`.
+- **A fresh flash session per change.** On a large site one session grew from 13k to 79k tokens over
   five changes; then a single 55 s grep put 97k tokens into it and the next change failed with
   `ContextOverflowError` ("too large to compact"). `opencode run` per change would pay about 3 s
   of start-up instead; the warm spare pays nothing.
 - **Hints from the words, not only the click.** For "drop no landlord, no reset" the click was on
   a layout element while the words lived in a content file. Two- and three-word phrases from the
   instruction are grepped in one `rg` pass and the matching lines go into the prompt, ranked by
-  phrase; "Own Your Creations" lands on `landing-stories.ts:160` directly.
+  phrase; "Own Your Creations" lands on the content file's line directly.
 - **`question` is switched off.** With it on, qwen answered the warm-up by asking the user a
   question, and a `question` tool call blocks the request until a human answers.
 - **The Opus lane is a session, not a prompt.** `claude -p` per change pays process start, a full
@@ -290,7 +410,7 @@ JSON event per line: `start` (page, tree, models, git HEAD), each `recgo` line t
 each `gate` verdict with the lines it held, and each `job` with its inputs (page, clicks, the
 screen text it matched, the hint files and why, the exact prompt), the agent's tool calls, the
 exact edits (old and new text), the result and every timing. The loop keeps its own record because
-recgo's session document is written at stop and can be missing: on 2026-09-27 two dcl.one
+recgo's session document is written at stop and can be missing: on 2026-09-27 two
 sessions ended with no `SESSION.md`, their final transcription having failed against a 503.
 
 `POST /__ai/replay` runs one case through the same gate and fast lane as live speech:
@@ -306,19 +426,21 @@ files through a running loop (start it with `--say none --claude-cmd none`) and 
 `--baseline` compares with an earlier `--out` and lists what got better, worse and slower. Cases
 whose `attach` differs from the loop's page are skipped, so one command covers several sites.
 
+The suites themselves are not in this repository: they are built from recorded sessions on a
+private tree. `evals/example.jsonl` shows the three shapes (gate, follow-up and targeting cases)
+on synthetic lines and the `demo/` page. The suites the numbers here come from were:
+
 | suite | what it holds | 2026-09-27 baseline |
 | --- | --- | --- |
-| `evals/gate.jsonl` | every line spoken in the day's sessions, reworded, labelled none / small / large, plus Spanish phrasings | request 64/65, lane 61/65 (2026-09-29; the same verdict on every case reworded, 2026-10-01) |
-| `evals/follow.jsonl` | a request and what was said next, reworded, labelled append / new; `"running": "claude"` when the change before was on Claude | follow 23/24 (2026-09-28), 22/24 (2026-09-29); 26 pairs on 2026-10-01, five runs each: 24.6 reworded, 25.4 as said, 0.4-0.9 s |
-| `evals/dcl-one.jsonl` | clicks, page-only, words, vague and misheard requests on dcl.one | target 6/6, median 1.5 s (2026-09-29; 2.5 s on 2026-09-27) |
-| `evals/claude.jsonl` | large changes recorded on dcl.one (reworded since the run), replayed through the Claude lane on a shared clone at the recorded rev (`scripts/claude-eval.ts --effort ...`) | 2026-09-30, 4/4 landed at every level; total 999 s at Claude Code's default, 538 s at medium, 622 s at high |
-| `evals/sites.jsonl` | decentraland/sites on a local Vite server | target 1/2, median 9.4 s |
+| gate | every line spoken in the day's sessions, reworded, labelled none / small / large, plus Spanish phrasings | request 64/65, lane 61/65 (2026-09-29; the same verdict on every case reworded, 2026-10-01) |
+| follow | a request and what was said next, reworded, labelled append / new; `"running": "claude"` when the change before was on Claude | follow 23/24 (2026-09-28), 22/24 (2026-09-29); 26 pairs on 2026-10-01, five runs each: 24.6 reworded, 25.4 as said, 0.4-0.9 s |
+| targeting | clicks, page-only, words, vague and misheard requests on a production site | target 6/6, median 1.5 s (2026-09-29; 2.5 s on 2026-09-27) |
+| claude | large recorded changes, replayed through the Claude lane on a shared clone at the recorded rev (`scripts/claude-eval.ts --effort ...`) | 2026-09-30, 4/4 landed at every level; total 999 s at Claude Code's default, 538 s at medium, 622 s at high |
+| sites | a public site on a local Vite server | target 1/2, median 9.4 s |
 
-The baselines are in `evals/results/`; up to 2026-09-30 they scored the words as said. The suites
-are published, so each recorded line is reworded, keeping the words the case turns on (change
-words, a mishearing, a trailing "and…") and not the transcript. Targeting cases name text in a live
-tree, so an edit that removes that text makes a case stale; gate cases depend on words only and do
-not age.
+Each recorded line is reworded, keeping the words the case turns on (change words, a mishearing, a
+trailing "and…") and not the transcript. Targeting cases name text in a live tree, so an edit that
+removes that text makes a case stale; gate cases depend on words only and do not age.
 
 New cases come from use: `scripts/cases-from-trajectory.ts TRAJECTORY.jsonl > draft.jsonl` turns
 each gate verdict of a run into a case (the page and clicks recgo had seen, the held lines, the
@@ -332,11 +454,11 @@ expectation where the loop got it wrong, reword what was said, and append it to 
   round trip.
 - recgo's realtime partials only hold a settling request back; dispatching on a partial the
   gate calls complete would start the edit before the end-of-utterance wait.
-- The gate question needs labelled narration and a Laya fine-tune
+- The gate question needs labelled narration and a fine-tuned gate model
   (`POST /v1/fine_tuning/jobs`) before `--gate-url` is more than plumbing. Asked the follow-up
-  question on the 12 pairs of `evals/follow.jsonl` (2026-09-27), Laya answered "new" to
+  question on the 12 pairs of the follow suite (2026-09-27), the untuned gate model answered "new" to
   all of them as a choice, and as a yes/no gave true follow-ups 0.10-0.90 and new requests up to
-  0.33, under every wording tried; the fast model got 11-12 of 12. `evals/follow.jsonl` is the
+  0.33, under every wording tried; the fast model got 11-12 of 12. The follow suite is the
   labelled set a fine-tune would start from.
 - recgo-tab takes screenshots around clicks only; a shot after each `HMR: update` would let a
   reviewing agent see the result without asking.
