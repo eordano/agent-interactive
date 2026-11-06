@@ -3,13 +3,17 @@
 const HELP = `agent-interactive: say a change to a web page, see it hot-reload, hear one sentence back
 
 USAGE
-  agent-interactive [DIR] [OPTIONS] [-- RECGO-TAB ARGS]
+  agent-interactive [DIR | PAGE.html] [OPTIONS] [-- RECGO-TAB ARGS]
 
-  DIR is the directory the agents may edit (default: the current one).
+  DIR is the directory the agents may edit (default: the current one). PAGE.html opens on that
+  page: the directory served is the one its relative links (../vendor/...) climb to.
 
 QUICK START
   # a local page: serve DIR with its own hot reload, type changes below
   agent-interactive demo
+
+  # one reveal.js deck in a folder of talks: opens on it, serves the folder its links need
+  agent-interactive ~/talks/2026.10/index.html --recgo -- --stt-backend realtime
 
   # a site a Vite dev server already serves: edit its working tree while you browse and talk
   agent-interactive ~/src/site --attach http://localhost:5173 \\
@@ -59,6 +63,8 @@ WHERE THE PAGE COMES FROM
                        served, its HMR socket is read and DIR is edited in place
   --search DIRS        with --attach: comma-separated dirs under DIR that hold the page's code;
                        what you click is looked up there (default: all of DIR)
+  --open PATH          the page under DIR to open and record (default index.html); a PAGE.html
+                       given as the argument sets it
   --port N             this loop's HTTP port (default 5199); the fast lane's server takes N+1. When
                        either is taken the next pair is tried (N+2, N+4, ... 50 of them) and the
                        loop says "listening on 127.0.0.1:PORT"
@@ -78,7 +84,9 @@ AGENTS
                        into. A change starts beside the running ones unless it touches a file
                        one of them is editing; unknown files (a bare "no, the other way") hold
                        only fast-lane changes
-  --claude-cmd CMD     the large-change lane (default claude; 'none' keeps everything fast)
+  --claude-cmd CMD     the large-change lane (default claude; 'none' keeps everything fast). Its agents
+                       run with SANDBOX_BACKEND=bwrap unless that is already set: like the fast lane's
+                       opencode-bwrap, a plain namespace writes an NFS folder the gVisor backend refuses
   --claude-model M     its model (default claude-opus-5-5)
   --claude-effort E    low, medium, high, xhigh or max: how hard each agent thinks (--effort);
                        default: Claude Code's own
@@ -96,7 +104,9 @@ LISTENING
                        (a browser with remote debugging, port 9222); otherwise it launches a
                        browser on the page. Arguments after -- go to recgo-tab
                        (--stt-backend realtime streams narration as you speak)
-  --recgo-port N       recgo-tab's CDP port (default 9333 for a launched browser, 9222 with --attach)
+  --recgo-port N       recgo-tab's CDP port (default 9333 for a launched browser, 9222 with --attach).
+                       When a browser already listens there (an earlier run's), recgo-tab attaches
+                       to it and the page opens in a tab of it
   --gate-url URL       judge narration with URL/v1/systemone instead of keywords
   --gate-model M       the model the gate asks (default auto)
   --gate-chat          the gate URL is an OpenAI-compatible server: ask URL/v1/chat/completions for a forced
@@ -181,7 +191,7 @@ function usage(msg: string): never {
   Deno.exit(64);
 }
 
-const OPTIONS = ["--port", "--attach", "--search", "--opencode", "--opencode-cmd", "--flash-model", "--flash-budget", "--claude-workers",
+const OPTIONS = ["--port", "--attach", "--search", "--open", "--opencode", "--opencode-cmd", "--flash-model", "--flash-budget", "--claude-workers",
   "--claude-cmd", "--claude-model", "--claude-effort", "--recgo", "--recgo-port", "--gate-url", "--gate-model", "--gate-key-file", "--say",
   "--tts-url", "--tts-voice", "--tts-speed", "--log", "--trajectories", "--no-toast", "--settle", "--no-follow-up", "--origin",
   "--stt-url", "--stt-model", "--tts-model", "--speech-key-file", "--widget", "--forge-url", "--forge-public-url", "--forge-repo", "--forge-token-file",
@@ -206,6 +216,7 @@ function parseArgs(raw: string[]) {
     port: 5199,
     attach: "",
     search: "",
+    open: "",
     opencode: "",
     opencodeCmd: "opencode-bwrap",
     flashModel: "cerebras/qwen-3.8-27b",
@@ -266,6 +277,7 @@ function parseArgs(raw: string[]) {
       case "--port": o.port = num(); break;
       case "--attach": o.attach = url(); break;
       case "--search": o.search = val(); break;
+      case "--open": o.open = val().replace(/^(\.\/|\/)+/, ""); break;
       case "--opencode": o.opencode = url(); break;
       case "--opencode-cmd": o.opencodeCmd = val(); break;
       case "--flash-model":
@@ -348,8 +360,32 @@ function parseArgs(raw: string[]) {
   return o;
 }
 
+function pageArg(o: ReturnType<typeof parseArgs>) {
+  let abs: string;
+  try {
+    abs = Deno.realPathSync(o.dir);
+    if (!Deno.statSync(abs).isFile) return;
+  } catch {
+    return;
+  }
+  if (!/\.html?$/i.test(abs)) die(`${o.dir} is a file; give the directory the agents may edit, or an .html page in it`);
+  const text = Deno.readTextFileSync(abs);
+  let up = 0;
+  for (const m of text.matchAll(/\b(?:href|src)=["']?((?:\.\.\/)+)/gi)) up = Math.max(up, m[1].length / 3);
+  const parts = abs.split("/");
+  const cut = Math.max(1, parts.length - 1 - up);
+  o.dir = parts.slice(0, cut).join("/") || "/";
+  o.open = parts.slice(cut).join("/");
+  const home = Deno.env.get("HOME")?.replace(/\/+$/, "");
+  if (home && (o.dir === home || home.startsWith(o.dir + "/") || o.dir === "/")) {
+    const ref = text.match(/\b(?:href|src)=["']?((?:\.\.\/)+[^"'\s>]*)/i)?.[1] ?? "../";
+    die(`${abs} refers to ${ref}, which makes ${o.dir} the directory the agents edit and watch: your home directory (or above it). The loop will not serve, watch or run agents over that. Keep the page and the files it links in one project directory, or name that directory as the argument.`);
+  }
+}
+
 if (Deno.args[0] === "parse") {
   const given = parseArgs(Deno.args.slice(1));
+  pageArg(given);
   const base = parseArgs([]);
   const set = Object.fromEntries(Object.entries(given).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(base[k as keyof typeof base])));
   try {
@@ -364,6 +400,7 @@ if (Deno.args[0] === "parse") {
 const doctorMode = Deno.args[0] === "doctor";
 const doctorJson = doctorMode && Deno.args.includes("--json");
 const o = parseArgs(doctorMode ? Deno.args.slice(1).filter((a) => a !== "--json") : Deno.args);
+pageArg(o);
 const askedPort = o.port;
 if (doctorMode) {
   o.trajectories = "none";
@@ -394,7 +431,9 @@ function freePort(nth: (i: number) => number): number {
 const root = (() => {
   try {
     const r = Deno.realPathSync(o.dir);
-    if (!Deno.statSync(r).isDirectory) die(`${o.dir} is a file; give the directory the agents may edit`);
+    if (!Deno.statSync(r).isDirectory) die(`${o.dir} is a file; give the directory the agents may edit, or an .html page in it`);
+    const home = Deno.env.get("HOME")?.replace(/\/+$/, "");
+    if (r === "/" || (home && (r === home || home.startsWith(r + "/")))) die(`${r} is your home directory (or above it); the loop will not serve, watch or run agents over it. Give one project directory.`);
     return r;
   } catch (e) {
     if (e instanceof Deno.errors.NotFound) die(`no such directory: ${o.dir}`);
@@ -414,7 +453,15 @@ for (const d of o.search ? searchDirs : []) {
     die(`--search ${d}: no such directory under ${root}`);
   }
 }
-const pageUrl = o.attach ? `${o.attach}/` : `http://localhost:${o.port}/`;
+if (o.open && !doctorMode) {
+  try {
+    if (!Deno.statSync(`${root}/${o.open}`).isFile) die(`--open ${o.open}: not a file under ${root}`);
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound) die(`--open ${o.open}: no such page under ${root}`);
+    throw e;
+  }
+}
+const pageUrl = o.attach ? `${o.attach}/` : `http://localhost:${o.port}/${o.open}`;
 const PAGE_ORIGINS = new Set([pageUrl, ...o.origins].map((u) => new URL(u).origin));
 function ownPage(url: string): boolean {
   try {
@@ -1659,6 +1706,7 @@ class TermClaude {
     let child: Deno.ChildProcess;
     try {
       const env = Object.fromEntries(Object.entries(Deno.env.toObject()).filter(([k]) => !/^(CLAUDECODE$|CLAUDE_CODE_|CLAUDE_PID$|CLAUDE_EFFORT$)/.test(k)));
+      env.SANDBOX_BACKEND ||= "bwrap";
       const anthropicKey = keyFrom(o.anthropicKeyFile);
       if (anthropicKey) env.ANTHROPIC_API_KEY = anthropicKey;
       if (o.anthropicWorkspaceId) env.ANTHROPIC_CUSTOM_HEADERS = `anthropic-workspace-id: ${o.anthropicWorkspaceId}`;
@@ -2823,24 +2871,75 @@ function owner(): Job | undefined {
   return best;
 }
 
+// Deno's recursive watcher follows every symlink under the root, so a link to / (a Wine prefix's
+// dosdevices/z:, a convenience link to a sibling checkout) walks it into directories it may not
+// read and the whole loop dies. Walk the tree here instead: real directories only, none of the
+// trees skipped() ignores, one non-recursive watch per directory, and a new watch for every
+// directory that appears later. An unreadable directory is skipped, not fatal.
+async function watchDirs(top: string, seen: Set<string>): Promise<string[]> {
+  const dirs: string[] = [];
+  const walk = async (dir: string) => {
+    if (seen.has(dir)) return;
+    seen.add(dir);
+    dirs.push(dir);
+    try {
+      for await (const e of Deno.readDir(dir)) {
+        if (!e.isDirectory) continue;
+        const abs = `${dir}/${e.name}`;
+        if (skipped(abs.slice(root.length + 1))) continue;
+        await walk(abs);
+      }
+    } catch { /* unreadable: nothing to watch */ }
+  };
+  await walk(top);
+  return dirs;
+}
+
 async function watch() {
-  for await (const ev of Deno.watchFs(root, { recursive: true })) {
-    if (ev.kind === "access" || ev.kind === "remove" || ev.kind === "other") continue;
+  const seen = new Set<string>();
+  // A directory that appears later is watched only once its create event is handled; files written
+  // into it in between are announced from a scan, as if just saved.
+  const add = async (top: string, announce = false) => {
+    const dirs = await watchDirs(top, seen);
+    if (!dirs.length) return;
+    consume(Deno.watchFs(dirs, { recursive: false }));
+    if (!announce) return;
+    for (const dir of dirs) {
+      try {
+        for await (const e of Deno.readDir(dir)) if (e.isFile) changed(`${dir}/${e.name}`.slice(root.length + 1));
+      } catch { /* gone already */ }
+    }
+  };
+  const consume = (w: Deno.FsWatcher) =>
+    (async () => { for await (const ev of w) await handle(ev); })().catch((e) => say(`watch: ${errText(e)}; some saves may not hot-reload`));
+  const isDir = async (p: string) => (await Deno.lstat(p).catch(() => undefined))?.isDirectory === true;
+  const handle = async (ev: Deno.FsEvent) => {
+    if (ev.kind === "remove") { for (const p of ev.paths) seen.delete(p); return; }
+    if (ev.kind === "access" || ev.kind === "other") return;
     for (const p of ev.paths) {
       const rel = p.slice(root.length + 1);
-      if (!EDITABLE.test(rel) || skipped(rel)) continue;
-      const job = hmrOwner([rel]);
-      if (job) {
-        job.write ??= now();
-        if (!job.files.includes(rel)) job.files.push(rel);
+      if (skipped(rel)) continue;
+      if ((ev.kind === "create" || ev.kind === "rename") && !seen.has(p) && await isDir(p)) {
+        add(p, true).catch((e) => say(`watch: cannot follow ${rel} (${errText(e)})`));
+        continue;
       }
-      clearTimeout(pending.get(rel));
-      pending.set(rel, setTimeout(() => {
-        pending.delete(rel);
-        pushUpdate(rel, job);
-      }, 20));
+      changed(rel);
     }
-  }
+  };
+  const changed = (rel: string) => {
+    if (!EDITABLE.test(rel) || skipped(rel)) return;
+    const job = hmrOwner([rel]);
+    if (job) {
+      job.write ??= now();
+      if (!job.files.includes(rel)) job.files.push(rel);
+    }
+    clearTimeout(pending.get(rel));
+    pending.set(rel, setTimeout(() => {
+      pending.delete(rel);
+      pushUpdate(rel, job);
+    }, 20));
+  };
+  await add(root);
 }
 
 function pushUpdate(rel: string, job?: Job) {
@@ -4580,10 +4679,8 @@ function onRecgoLine(line: string) {
   console.log(`recgo| ${line}`);
 }
 
-async function recgoTab(): Promise<string[] | undefined> {
-  const port = o.recgoPort || 9222;
+async function recgoTab(port = o.recgoPort || 9222, host = new URL(o.attach || pageUrl).host): Promise<string[] | undefined> {
   const cdp = `http://127.0.0.1:${port}`;
-  const host = new URL(o.attach).host;
   let list: { id: string; type: string; url: string }[];
   for (let told = false;;) {
     try {
@@ -4603,7 +4700,8 @@ async function recgoTab(): Promise<string[] | undefined> {
       return "";
     }
   };
-  let tab = list.find((t) => t.type === "page" && hostOf(t.url) === host);
+  const pages = list.filter((t) => t.type === "page" && hostOf(t.url) === host);
+  let tab = pages.find((t) => samePath(t.url, pageUrl)) ?? pages[0];
   if (tab) say(`recgo-tab records your open tab ${clip(tab.url, 80)}`);
   else {
     const r = await fetch(`${cdp}/json/new?${encodeURI(pageUrl)}`, { method: "PUT", signal: AbortSignal.timeout(5000) })
@@ -4621,7 +4719,11 @@ async function recgoTab(): Promise<string[] | undefined> {
 }
 
 async function startRecgo() {
-  const args = o.attach ? await recgoTab() : ["--launch", pageUrl, "--port", String(o.recgoPort || 9333)];
+  const port = o.recgoPort || 9333;
+  const taken = !o.attach &&
+    await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(800) }).then((r) => r.ok, () => false);
+  if (taken) say(`--recgo: a browser already listens on port ${port} (an earlier run's, or yours): recgo-tab attaches to it instead of launching one`);
+  const args = o.attach || taken ? await recgoTab(port) : ["--launch", pageUrl, "--port", String(port)];
   if (!args) return;
   try {
     recgo = new Deno.Command("recgo-tab", { args: [...args, ...o.recgoArgs], stdin: "piped", stdout: "piped", stderr: "piped" })
@@ -4715,11 +4817,12 @@ async function doctor(): Promise<never> {
       add("page", "fail", `${o.attach}: ${errText(e)}`, "start the page's dev server, or check the URL");
     }
   } else {
+    const page = o.open || "index.html";
     let index = false;
     try {
-      index = Deno.statSync(`${root}/index.html`).isFile;
+      index = Deno.statSync(`${root}/${page}`).isFile;
     } catch { /* none */ }
-    add("page", index ? "ok" : "warn", index ? `${root}/index.html, served here with its own hot reload` : `no index.html in ${root}`,
+    add("page", index ? "ok" : o.open ? "fail" : "warn", index ? `${root}/${page}, served here with its own hot reload` : `no ${page} in ${root}`,
       "pick the folder that holds the page, or the URL of the dev server that serves it");
   }
 
@@ -4878,7 +4981,7 @@ if (o.attach) {
   say(`attached to ${pageUrl}: agents edit ${searchDirs.map((d) => d === "." ? root : `${root}/${d}`).join(", ")}`);
   say(`instructions: type here, or curl -X POST 'localhost:${o.port}/__ai/say?wait=1' --data '...'`);
 } else {
-  watch();
+  watch().catch((e) => say(`watch: ${errText(e)}; saves will not hot-reload the page`));
   say(`serving ${root} at ${pageUrl}`);
   if (!inlineAll) say(`${root} is over the fast lane's 64 KB prompt: it gets the files around their words and the page on screen, and may grep and read`);
 }

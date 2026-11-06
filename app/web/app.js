@@ -8,7 +8,7 @@ const $ = (sel) => document.querySelector(sel);
 const enc = new TextEncoder();
 
 const DEFAULTS = {
-  dir: "", attach: true, url: "", search: "", flashModel: "cerebras/qwen-3.8-27b", opencodeCmd: "opencode",
+  dir: "", attach: true, url: "", open: "", search: "", flashModel: "cerebras/qwen-3.8-27b", opencodeCmd: "opencode",
   claudeWorkers: 4, claudeModel: "claude-opus-5-5", claudeEffort: "", voice: false, browserPort: 9222, sttBackend: "realtime", speech: false, ttsUrl: "",
 };
 const FIELDS = Object.keys(DEFAULTS);
@@ -85,6 +85,7 @@ function syncForm() {
   const f = $("#form");
   const s = readForm();
   f.elements.url.disabled = !s.attach || "url" in managed;
+  f.elements.open.disabled = s.attach || "open" in managed;
   f.elements.browserPort.disabled = !s.voice || !s.attach || "browserPort" in managed;
   f.elements.sttBackend.disabled = !s.voice || "sttBackend" in managed;
   f.elements.ttsUrl.disabled = !s.speech || "ttsUrl" in managed;
@@ -108,14 +109,14 @@ const CLI_SWITCH = { followUp: "--no-follow-up", toast: "--no-toast" };
 
 function fromCli(g) {
   const s = {
-    ...DEFAULTS, dir: g.dir, attach: Boolean(g.attach), url: g.attach ?? "", search: g.search ?? "",
+    ...DEFAULTS, dir: g.dir, attach: Boolean(g.attach), url: g.attach ?? "", open: g.open ?? "", search: g.search ?? "",
     flashModel: g.flashModel ?? DEFAULTS.flashModel, opencodeCmd: g.opencodeCmd ?? "opencode-bwrap",
     claudeWorkers: g.claudeCmd === "none" ? 0 : g.claudeWorkers ?? DEFAULTS.claudeWorkers,
     claudeModel: g.claudeModel ?? DEFAULTS.claudeModel, claudeEffort: g.claudeEffort ?? "",
     voice: Boolean(g.recgo), browserPort: g.recgoPort ?? DEFAULTS.browserPort, sttBackend: effective().sttBackend,
     speech: g.say !== "none", ttsUrl: g.ttsUrl ?? "http://127.0.0.1:8000",
   };
-  const taken = new Set(["dir", "attach", "search", "flashModel", "opencodeCmd", "claudeWorkers", "claudeModel", "claudeEffort", "recgo", "ttsUrl", "recgoArgs"]);
+  const taken = new Set(["dir", "attach", "open", "search", "flashModel", "opencodeCmd", "claudeWorkers", "claudeModel", "claudeEffort", "recgo", "ttsUrl", "recgoArgs"]);
   if (g.claudeCmd === "none") taken.add("claudeCmd");
   if (g.say === "none" || g.say === "speaches") taken.add("say");
   if (s.attach) taken.add("recgoPort");
@@ -136,6 +137,7 @@ function argsFor(s, port) {
   const a = [s.dir];
   if (port) a.push("--port", String(port));
   if (s.attach && s.url) a.push("--attach", s.url);
+  if (!s.attach && s.open && s.open !== "index.html") a.push("--open", s.open);
   if (s.search.trim()) a.push("--search", s.search.replace(/\s+/g, ""));
   a.push("--flash-model", s.flashModel, "--opencode-cmd", s.opencodeCmd);
   if (s.claudeWorkers > 0) {
@@ -228,7 +230,7 @@ async function start(ev) {
   terms.clear();
   $("#view-body").replaceChildren();
   text($("#run-title"), settings.dir.split("/").filter(Boolean).pop() ?? settings.dir);
-  text($("#run-page"), settings.attach ? settings.url : `${settings.dir}/index.html`);
+  text($("#run-page"), settings.attach ? settings.url : `${settings.dir}/${settings.open || "index.html"}`);
   $("#setup").hidden = true;
   $("#run").hidden = false;
   text($("#run-state"), "Starting: warming up the fast lane...");

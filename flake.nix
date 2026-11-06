@@ -18,5 +18,36 @@
         app = pkgs.callPackage ./app.nix { inherit agent-interactive; };
         default = agent-interactive;
       });
+
+      devShells = forAll (pkgs: {
+        default = pkgs.mkShell {
+          packages =
+            with pkgs;
+            [
+              deno
+              ripgrep
+              git
+              curl
+              nodejs
+              cargo
+              rustc
+              cargo-tauri
+              pkg-config
+            ]
+            ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+              webkitgtk_4_1
+              gtk3
+              libsoup_3
+              glib-networking
+              gsettings-desktop-schemas
+              dbus
+              openssl
+            ];
+          shellHook = ''
+            export AGENT_INTERACTIVE_CLI="$PWD/agent-interactive.ts"
+            export PATH="$PWD/pty/target/release:$PATH"
+          '';
+        };
+      });
     };
 }

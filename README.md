@@ -13,12 +13,14 @@ curl -X POST 'localhost:5199/__ai/say?wait=1' --data 'make the title dark red'
 ./agent-interactive.ts ~/src/site --attach http://localhost:5173 \
     --search src --recgo -- --stt-backend realtime
 
-# a folder of reveal.js decks: open one at localhost:5199/<deck>.html and talk over it
-./agent-interactive.ts ~/talks --recgo -- --stt-backend realtime
+# one reveal.js deck in a folder of talks: opens on it and serves the folder its links need
+./agent-interactive.ts ~/talks/2026.10/index.html --recgo -- --stt-backend realtime
 ```
 
-Open `http://localhost:5199/` (with `--recgo`, recgo-tab opens it for you). `--help` has every
-option; a mistyped one is answered with the nearest real one.
+Open `http://localhost:5199/` (with `--recgo`, recgo-tab opens it for you; when a browser from an
+earlier run still listens on its port, the page opens in a tab of that browser instead of a second
+one failing to launch, 2026-10-30). `--help` has every option; a mistyped one is answered with the
+nearest real one.
 
 ## `--attach`: a page a Vite dev server already serves
 
@@ -152,13 +154,21 @@ inline script looks up by id, or when a section uses `data-markdown`.
 Phrases are matched across inline markup: "worth coming back" finds `Worth<br>coming<br>back`.
 Decks written by a build script are overwritten on their next build; talk over the hand-written ones.
 
+A deck given as the argument (`agent-interactive ~/talks/2026.10/index.html`) is the page opened:
+the served folder is the one its relative links climb to (`../vendor/reveal.js/...` puts it one
+level up), so the theme and reveal.js load and the folder's other decks stay in reach; `--open
+PATH` names the page under DIR explicitly. The page's own file and the stylesheets it links are
+what the fast lane sees first; a 21 KB deck goes in whole, a bigger one as the 80 lines around
+the slide on screen. A save from any editor goes through the same path as the agents' edits: the
+changed slides are swapped in place and the deck stays on the slide.
+
 ## The app
 
 `app/` is a Tauri window (Rust in `app/src-tauri`, plain HTML/JS in `app/web`, no framework and
 no npm lockfile) that starts this loop and shows it:
 
-- **Set up a session**: the folder, the page (its dev server's URL, or the folder's own
-  `index.html`), where its code is, the fast lane's model, command and key, how many Claude agents
+- **Set up a session**: the folder, the page (its dev server's URL, or a page under the folder,
+  `index.html` unless said otherwise), where its code is, the fast lane's model, command and key, how many Claude agents
   and their model, voice and spoken replies. *Check setup* runs `agent-interactive doctor --json`
   with exactly those options and lists every check with its fix; *Start session* is enabled once
   nothing fails. Settings live in the app's config dir; a machine can pin values in
@@ -190,10 +200,13 @@ Installing: anywhere with Nix, from this directory: `nix build .#app` (the windo
 or aarch64-darwin) or `nix build` (the loop alone: `agent-interactive` and `agent-pty`). The lock
 pins the nixpkgs revision it is built and tested with.
 
-From a checkout (Linux): `app/prepare.sh` fetches ghostty-web (checked against npm's sha512) and
-makes the icons from `app/icon.svg`; then, in a shell with cargo, cargo-tauri, pkg-config,
-webkitgtk 4.1, gtk3, libsoup 3 and dbus, run the app with `AGENT_INTERACTIVE_CLI` pointing at
-`agent-interactive.ts` and `agent-pty` on PATH (`cd pty && cargo build --release`).
+From a checkout: `nix develop` is the shell to work in. It carries the loop's Deno, rg, git and
+curl, node for the unit tests (`node --test *.test.mjs`), and the app's toolchain (cargo,
+cargo-tauri, pkg-config and, on Linux, webkitgtk 4.1, gtk3, libsoup 3, dbus); it points
+`AGENT_INTERACTIVE_CLI` at this checkout's `agent-interactive.ts` and puts `pty/target/release`
+on PATH, so `cd pty && cargo build --release` gives the app its `agent-pty`. `app/prepare.sh`
+fetches ghostty-web (checked against npm's sha512) and makes the icons from `app/icon.svg`;
+then `cd app/src-tauri && cargo tauri dev` runs the window against the checkout.
 
 Tested on 2026-09-29 in a headless sway (its sockets in a short `$XDG_RUNTIME_DIR`: the 108-byte
 socket path limit rules out a long scratch dir) through `tauri-driver` in front of WebKitGTK's
